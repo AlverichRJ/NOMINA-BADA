@@ -68,6 +68,8 @@ export const appRouter = router({
           nombre: z.string().min(1).optional(),
           salarioMensual: z.number().min(0).optional(),
           bonos: z.number().min(0).optional(),
+          diasLaborados: z.number().min(0).optional(),
+          descuentosAdicionales: z.number().min(0).optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -76,6 +78,8 @@ export const appRouter = router({
         if (data.nombre !== undefined) updateData.nombre = data.nombre;
         if (data.salarioMensual !== undefined) updateData.salarioMensual = data.salarioMensual.toFixed(2);
         if (data.bonos !== undefined) updateData.bonos = data.bonos.toFixed(2);
+        if (data.diasLaborados !== undefined) updateData.diasLaborados = data.diasLaborados;
+        if (data.descuentosAdicionales !== undefined) updateData.descuentosAdicionales = data.descuentosAdicionales.toFixed(2);
         await actualizarEmpleado(id, updateData as any);
         return { success: true };
       }),

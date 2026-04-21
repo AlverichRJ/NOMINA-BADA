@@ -38,3 +38,13 @@
 
 ## Documentación
 - [x] README_VSCODE.md con instrucciones para trabajar en VS Code
+
+## Mejoras v2 - Tabla de Empleados
+- [x] Agregar columnas dias_laborados y descuentos_adicionales a BD (ALTER TABLE)
+- [x] Actualizar schema Drizzle con nuevos campos
+- [x] Actualizar procedimiento tRPC empleados.update para nuevos campos
+- [x] Edición inline de Días Laborados directamente en la tabla
+- [x] Edición inline de Descuentos directamente en la tabla
+- [x] Columna Salario Semanal calculada: (salario/30)*dias_laborados - descuentos
+- [x] Fila de totales al pie de la tabla de empleados
+- [x] Carga de 88 empleados con salarios correctos desde imagen

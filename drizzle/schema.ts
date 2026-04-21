@@ -32,6 +32,8 @@ export const empleados = mysqlTable("empleados", {
   nombre: varchar("nombre", { length: 255 }).notNull(),
   salarioMensual: decimal("salario_mensual", { precision: 12, scale: 2 }).notNull().default("0"),
   bonos: decimal("bonos", { precision: 12, scale: 2 }).notNull().default("0"),
+  diasLaborados: int("dias_laborados").notNull().default(0),
+  descuentosAdicionales: decimal("descuentos_adicionales", { precision: 12, scale: 2 }).notNull().default("0"),
   activo: boolean("activo").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

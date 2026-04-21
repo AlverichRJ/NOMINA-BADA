@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Plus, Search, Trash2, Users } from "lucide-react";
+import { Check, Edit2, Plus, Search, Trash2, Users, X } from "lucide-react";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
@@ -34,7 +34,82 @@ type Empleado = {
   nombre: string;
   salarioMensual: string | number;
   bonos: string | number;
+  diasLaborados?: number | null;
+  descuentosAdicionales?: string | number | null;
 };
+
+// Celda editable inline
+function EditableCell({
+  value,
+  type = "number",
+  onSave,
+  format,
+}: {
+  value: string | number;
+  type?: string;
+  onSave: (val: number) => void;
+  format: (val: number) => string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    setDraft(String(value));
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 50);
+  }
+
+  function commit() {
+    const n = parseFloat(draft);
+    if (!isNaN(n) && n >= 0) {
+      onSave(n);
+    }
+    setEditing(false);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft(String(value));
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <Input
+          ref={inputRef}
+          type={type}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") cancel();
+          }}
+          className="h-7 w-28 text-right text-sm px-2"
+          min={0}
+        />
+        <button onClick={commit} className="text-green-600 hover:text-green-700 p-0.5">
+          <Check className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={cancel} className="text-muted-foreground hover:text-foreground p-0.5">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  const num = parseFloat(String(value)) || 0;
+  return (
+    <button
+      onClick={startEdit}
+      className="group flex items-center gap-1 justify-end w-full text-right hover:text-primary transition-colors"
+      title="Clic para editar"
+    >
+      <span className="text-sm font-medium">{format(num)}</span>
+      <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
+    </button>
+  );
+}
 
 export default function Empleados() {
   const utils = trpc.useUtils();
@@ -58,9 +133,7 @@ export default function Empleados() {
   const updateMutation = trpc.empleados.update.useMutation({
     onSuccess: () => {
       utils.empleados.list.invalidate();
-      toast.success("Empleado actualizado correctamente");
-      setDialogOpen(false);
-      setEditEmpleado(null);
+      toast.success("Guardado");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -101,9 +174,20 @@ export default function Empleados() {
     if (isNaN(salario) || salario < 0) return toast.error("Salario inválido");
     if (editEmpleado) {
       updateMutation.mutate({ id: editEmpleado.id, nombre: form.nombre, salarioMensual: salario, bonos });
+      setDialogOpen(false);
+      setEditEmpleado(null);
     } else {
       createMutation.mutate({ nombre: form.nombre, salarioMensual: salario, bonos });
     }
+  }
+
+  // Cálculo de salario semanal: (salario_mensual / 30) * dias_laborados - descuentos
+  function calcularSalarioSemanal(emp: Empleado): number {
+    const salario = parseFloat(String(emp.salarioMensual)) || 0;
+    const dias = emp.diasLaborados ?? 0;
+    const descuentos = parseFloat(String(emp.descuentosAdicionales)) || 0;
+    const bruto = (salario / 30) * dias;
+    return Math.max(0, bruto - descuentos);
   }
 
   return (
@@ -115,7 +199,7 @@ export default function Empleados() {
             Empleados
           </h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona la nómina y datos de cada empleado
+            Gestiona la nómina y datos de cada empleado. Haz clic en cualquier celda numérica para editarla.
           </p>
         </div>
         <Button
@@ -145,6 +229,12 @@ export default function Empleados() {
         </Badge>
       </div>
 
+      {/* Leyenda */}
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <Edit2 className="w-3 h-3" />
+        Las columnas <strong>Días Laborados</strong> y <strong>Descuentos</strong> son editables directamente en la tabla. Haz clic sobre el valor para modificarlo.
+      </p>
+
       {/* Table */}
       <Card className="border border-border/60 shadow-sm">
         <CardContent className="p-0">
@@ -171,19 +261,31 @@ export default function Empleados() {
               <table className="w-full">
                 <thead>
                   <tr style={{ background: "oklch(0.975 0.004 240)" }}>
-                    <th className="text-left px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Nombre
                     </th>
-                    <th className="text-right px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Salario Mensual
                     </th>
-                    <th className="text-right px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Bonos
-                    </th>
-                    <th className="text-right px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Salario Diario
                     </th>
-                    <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
+                    <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        Días Laborados
+                        <Edit2 className="w-3 h-3 text-primary/60" />
+                      </span>
+                    </th>
+                    <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        Descuentos
+                        <Edit2 className="w-3 h-3 text-primary/60" />
+                      </span>
+                    </th>
+                    <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(0.35 0.12 145)" }}>
+                      Salario Semanal
+                    </th>
+                    <th className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
                       Acciones
                     </th>
                   </tr>
@@ -191,10 +293,14 @@ export default function Empleados() {
                 <tbody className="divide-y divide-border/40">
                   {filtered.map((emp) => {
                     const salario = parseFloat(String(emp.salarioMensual)) || 0;
-                    const bonos = parseFloat(String(emp.bonos)) || 0;
+                    const diasLaborados = emp.diasLaborados ?? 0;
+                    const descuentos = parseFloat(String(emp.descuentosAdicionales)) || 0;
+                    const salarioSemanal = calcularSalarioSemanal(emp);
+
                     return (
                       <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4">
+                        {/* Nombre */}
+                        <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -207,30 +313,66 @@ export default function Empleados() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+
+                        {/* Salario Mensual */}
+                        <td className="px-4 py-3.5 text-right">
                           <span className="font-semibold text-sm">{formatCurrency(salario)}</span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          {bonos > 0 ? (
-                            <span className="text-sm font-medium" style={{ color: "oklch(0.45 0.15 145)" }}>
-                              {formatCurrency(bonos)}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
+
+                        {/* Salario Diario */}
+                        <td className="px-4 py-3.5 text-right">
                           <span className="text-sm text-muted-foreground">
                             {formatCurrency(salario / 30)}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
+
+                        {/* Días Laborados — editable */}
+                        <td className="px-4 py-3.5">
+                          <EditableCell
+                            value={diasLaborados}
+                            type="number"
+                            format={(v) => `${v} días`}
+                            onSave={(val) =>
+                              updateMutation.mutate({ id: emp.id, diasLaborados: Math.round(val) })
+                            }
+                          />
+                        </td>
+
+                        {/* Descuentos — editable */}
+                        <td className="px-4 py-3.5">
+                          <EditableCell
+                            value={descuentos}
+                            type="number"
+                            format={(v) =>
+                              v > 0 ? (
+                                formatCurrency(v)
+                              ) : "—"
+                            }
+                            onSave={(val) =>
+                              updateMutation.mutate({ id: emp.id, descuentosAdicionales: val })
+                            }
+                          />
+                        </td>
+
+                        {/* Salario Semanal — calculado */}
+                        <td className="px-4 py-3.5 text-right">
+                          <span
+                            className="font-bold text-sm"
+                            style={{ color: diasLaborados > 0 ? "oklch(0.40 0.15 145)" : "oklch(0.6 0.01 240)" }}
+                          >
+                            {diasLaborados > 0 ? formatCurrency(salarioSemanal) : "—"}
+                          </span>
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => openEdit(emp)}
                               className="h-8 w-8 p-0"
+                              title="Editar nombre y salario"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
@@ -239,6 +381,7 @@ export default function Empleados() {
                               size="sm"
                               onClick={() => setDeleteId(emp.id)}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              title="Eliminar empleado"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -248,6 +391,30 @@ export default function Empleados() {
                     );
                   })}
                 </tbody>
+
+                {/* Totales */}
+                {filtered.length > 0 && (
+                  <tfoot>
+                    <tr style={{ background: "oklch(0.97 0.005 240)", borderTop: "2px solid oklch(0.88 0.01 240)" }}>
+                      <td className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground" colSpan={2}>
+                        Totales ({filtered.length} empleados)
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-muted-foreground">—</td>
+                      <td className="px-4 py-3 text-right text-xs font-semibold">
+                        {filtered.reduce((s, e) => s + (e.diasLaborados ?? 0), 0)} días
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs font-semibold text-destructive">
+                        {formatCurrency(
+                          filtered.reduce((s, e) => s + (parseFloat(String(e.descuentosAdicionales)) || 0), 0)
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-bold" style={{ color: "oklch(0.35 0.15 145)" }}>
+                        {formatCurrency(filtered.reduce((s, e) => s + calcularSalarioSemanal(e), 0))}
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           )}
@@ -285,11 +452,13 @@ export default function Empleados() {
               <Input
                 id="bonos"
                 type="number"
-                placeholder="Ej: 5000"
+                placeholder="Ej: 500"
                 value={form.bonos}
                 onChange={(e) => setForm({ ...form, bonos: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">Bonos adicionales para este período</p>
+              <p className="text-xs text-muted-foreground">
+                Los días laborados y descuentos se editan directamente en la tabla.
+              </p>
             </div>
           </div>
           <DialogFooter>
