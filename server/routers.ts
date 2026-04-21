@@ -119,25 +119,32 @@ export const appRouter = router({
           throw new Error("No se pudo determinar el rango de fechas del archivo");
         }
 
-        // Crear período
-        const nombrePeriodo = `${fechaInicio} al ${fechaFin}`;
-        await crearPeriodo({
-          nombre: nombrePeriodo,
-          fechaInicio,
-          fechaFin,
-          archivoNombre: input.nombreArchivo,
-        });
+        // Verificar si ya existe un período con el mismo nombre o archivo para evitar duplicados
+        const periodosExistentes = await getPeriodos();
+        const periodoExistente = periodosExistentes.find(
+          (p) => p.nombre === `${fechaInicio} al ${fechaFin}` || p.archivoNombre === input.nombreArchivo
+        );
 
-        // Obtener el período recién creado
-        const periodosDB = await getPeriodos();
-        const periodoActual = periodosDB[0];
-        if (!periodoActual) throw new Error("Error al crear período");
-
-        const periodoId = periodoActual.id;
-
-        // Limpiar datos previos del período
-        await eliminarAsistenciasPeriodo(periodoId);
-        await eliminarCalculosPeriodo(periodoId);
+        let periodoId: number;
+        if (periodoExistente) {
+          // Reusar el período existente y limpiar sus datos
+          periodoId = periodoExistente.id;
+          await eliminarAsistenciasPeriodo(periodoId);
+          await eliminarCalculosPeriodo(periodoId);
+        } else {
+          // Crear período nuevo
+          const nombrePeriodo = `${fechaInicio} al ${fechaFin}`;
+          await crearPeriodo({
+            nombre: nombrePeriodo,
+            fechaInicio,
+            fechaFin,
+            archivoNombre: input.nombreArchivo,
+          });
+          const periodosDB = await getPeriodos();
+          const periodoActual = periodosDB[0];
+          if (!periodoActual) throw new Error("Error al crear período");
+          periodoId = periodoActual.id;
+        }
 
         // Obtener todos los empleados de la DB
         const empleadosDB = await getEmpleados();
@@ -241,9 +248,10 @@ export const appRouter = router({
           });
         }
 
+        const periodoFinal = periodoExistente ?? (await getPeriodos())[0];
         return {
           periodoId,
-          nombrePeriodo,
+          nombrePeriodo: periodoFinal?.nombre ?? `${fechaInicio} al ${fechaFin}`,
           totalEmpleados: resultados.length,
           resultados,
         };
