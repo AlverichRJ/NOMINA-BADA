@@ -10,6 +10,7 @@ import Empleados from "./pages/Empleados";
 import CargarReporte from "./pages/CargarReporte";
 import Reportes from "./pages/Reportes";
 import ReporteDetalle from "./pages/ReporteDetalle";
+import ImportarSalarios from "./pages/ImportarSalarios";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
         <Route path="/cargar" component={CargarReporte} />
         <Route path="/reportes" component={Reportes} />
         <Route path="/reportes/:id" component={ReporteDetalle} />
+        <Route path="/importar-salarios" component={ImportarSalarios} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

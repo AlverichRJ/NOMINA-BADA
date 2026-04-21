@@ -315,6 +315,113 @@ export const appRouter = router({
         return getAsistenciasByEmpleadoPeriodo(input.empleadoId, input.periodoId);
       }),
   }),
+
+  // ─── IMPORTACIÓN DE SALARIOS ──────────────────────────────────────────────────────────────────────
+  salarios: router({
+    // Previsualizar los datos del archivo antes de importar
+    preview: publicProcedure
+      .input(z.object({ contenido: z.string(), formato: z.enum(["csv", "xlsx_base64"]) }))
+      .mutation(async ({ input }) => {
+        const filas = parsearArchivoSalarios(input.contenido, input.formato);
+        return { filas, total: filas.length };
+      }),
+
+    // Confirmar e importar los salarios a la BD
+    importar: publicProcedure
+      .input(
+        z.object({
+          filas: z.array(
+            z.object({
+              nombre: z.string(),
+              salarioMensual: z.number(),
+              bonos: z.number().optional().default(0),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const empleadosDB = await getEmpleados();
+
+        function normNombre(s: string) {
+          return s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+        }
+        function similitud(a: string, b: string): number {
+          const pa = new Set(normNombre(a).split(" ").filter((p: string) => p.length >= 3));
+          const pb = new Set(normNombre(b).split(" ").filter((p: string) => p.length >= 3));
+          let c = 0;
+          Array.from(pa).forEach((p: string) => { if (pb.has(p)) c++; });
+          return c;
+        }
+
+        const resultados = [];
+        for (const fila of input.filas) {
+          // Buscar empleado existente por nombre exacto o similitud
+          let emp = empleadosDB.find((e) => normNombre(e.nombre) === normNombre(fila.nombre));
+          if (!emp) {
+            let mejorScore = 0, mejorMatch = null;
+            for (const e of empleadosDB) {
+              const s = similitud(fila.nombre, e.nombre);
+              if (s > mejorScore) { mejorScore = s; mejorMatch = e; }
+            }
+            if (mejorMatch && mejorScore >= 2) emp = mejorMatch;
+          }
+
+          if (emp) {
+            // Actualizar salario del empleado existente
+            await actualizarEmpleado(emp.id, {
+              salarioMensual: fila.salarioMensual.toFixed(2),
+              bonos: (fila.bonos ?? 0).toFixed(2),
+            } as any);
+            resultados.push({ nombre: fila.nombre, accion: "actualizado", empleadoId: emp.id });
+          } else {
+            // Crear nuevo empleado
+            await crearEmpleado({
+              nombre: fila.nombre,
+              salarioMensual: fila.salarioMensual.toFixed(2),
+              bonos: (fila.bonos ?? 0).toFixed(2),
+            });
+            resultados.push({ nombre: fila.nombre, accion: "creado", empleadoId: null });
+          }
+        }
+        return { total: resultados.length, resultados };
+      }),
+  }),
 });
+
+// ─── PARSER DE ARCHIVO DE SALARIOS ──────────────────────────────────────────────────────────────────────
+function parsearArchivoSalarios(contenido: string, formato: "csv" | "xlsx_base64"): Array<{ nombre: string; salarioMensual: number; bonos: number }> {
+  if (formato === "csv") {
+    const lineas = contenido.split(/\r?\n/).filter((l) => l.trim());
+    const filas = [];
+    for (const linea of lineas.slice(1)) { // saltar encabezado
+      const cols = linea.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+      if (cols.length < 2) continue;
+      const nombre = cols[0];
+      const salario = parseFloat(cols[1].replace(/[$,\s]/g, ""));
+      const bonos = cols[2] ? parseFloat(cols[2].replace(/[$,\s]/g, "")) || 0 : 0;
+      if (nombre && !isNaN(salario) && salario > 0) {
+        filas.push({ nombre, salarioMensual: salario, bonos });
+      }
+    }
+    return filas;
+  } else {
+    // xlsx_base64
+    const XLSX = require("xlsx");
+    const buf = Buffer.from(contenido, "base64");
+    const wb = XLSX.read(buf, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    const filas = [];
+    for (const row of rows.slice(1)) { // saltar encabezado
+      const nombre = String(row[0] || "").trim();
+      const salario = parseFloat(String(row[1] || "").replace(/[$,\s]/g, ""));
+      const bonos = row[2] ? parseFloat(String(row[2]).replace(/[$,\s]/g, "")) || 0 : 0;
+      if (nombre && !isNaN(salario) && salario > 0) {
+        filas.push({ nombre, salarioMensual: salario, bonos });
+      }
+    }
+    return filas;
+  }
+}
 
 export type AppRouter = typeof appRouter;

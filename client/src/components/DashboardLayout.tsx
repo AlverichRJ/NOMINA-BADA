@@ -30,6 +30,7 @@ import {
   PanelLeft,
   Upload,
   Users,
+  DollarSign,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -39,6 +40,7 @@ import { Button } from "./ui/button";
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Users, label: "Empleados", path: "/empleados" },
+  { icon: DollarSign, label: "Importar Salarios", path: "/importar-salarios" },
   { icon: Upload, label: "Cargar Reporte", path: "/cargar" },
   { icon: BarChart3, label: "Reportes", path: "/reportes" },
 ];

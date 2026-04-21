@@ -48,3 +48,10 @@
 - [x] Columna Salario Semanal calculada: (salario/30)*dias_laborados - descuentos
 - [x] Fila de totales al pie de la tabla de empleados
 - [x] Carga de 88 empleados con salarios correctos desde imagen
+
+## Importación de Salarios desde Archivo
+- [x] Procedimiento tRPC para importar salarios desde CSV/Excel
+- [x] Página de Importar Salarios con preview de datos antes de confirmar
+- [x] Soporte para formato: Nombre, Salario Mensual (CSV y Excel .xlsx)
+- [x] Al importar: actualizar salario de empleados existentes y crear nuevos si no existen
+- [x] Plantilla descargable de ejemplo para que el usuario sepa el formato esperado
