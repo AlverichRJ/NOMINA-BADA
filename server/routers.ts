@@ -143,13 +143,42 @@ export const appRouter = router({
         const empleadosDB = await getEmpleados();
         const empleadosMap = new Map(empleadosDB.map((e) => [e.nombre.toLowerCase().trim(), e]));
 
+        // Helper: normalizar nombre (sin acentos, minúsculas)
+        function normalizarNombre(s: string) {
+          return s.toLowerCase().trim()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ");
+        }
+
+        // Helper: similitud por palabras en común (>= 3 chars)
+        function similitudNombre(a: string, b: string): number {
+          const palabrasA = new Set(normalizarNombre(a).split(" ").filter((p: string) => p.length >= 3));
+          const palabrasB = new Set(normalizarNombre(b).split(" ").filter((p: string) => p.length >= 3));
+          let comunes = 0;
+          Array.from(palabrasA).forEach((p: string) => { if (palabrasB.has(p)) comunes++; });
+          return comunes;
+        }
+
         const resultados = [];
 
         for (const empParsed of empleadosParsed) {
-          // Buscar empleado en DB (por nombre exacto o parcial)
+          // 1. Buscar por nombre exacto
           let empleadoDB = empleadosMap.get(empParsed.nombre.toLowerCase().trim());
 
-          // Si no existe, crear empleado con salario 0
+          // 2. Si no existe, buscar por similitud de palabras (match inteligente)
+          if (!empleadoDB) {
+            let mejorScore = 0;
+            let mejorMatch = null;
+            for (const emp of empleadosDB) {
+              const score = similitudNombre(empParsed.nombre, emp.nombre);
+              if (score > mejorScore) { mejorScore = score; mejorMatch = emp; }
+            }
+            if (mejorMatch && mejorScore >= 2) {
+              empleadoDB = mejorMatch;
+            }
+          }
+
+          // 3. Solo crear nuevo empleado si realmente no hay match
           if (!empleadoDB) {
             await crearEmpleado({
               nombre: empParsed.nombre,
