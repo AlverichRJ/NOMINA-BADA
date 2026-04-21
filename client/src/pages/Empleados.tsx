@@ -181,13 +181,15 @@ export default function Empleados() {
     }
   }
 
-  // Cálculo de salario semanal: (salario_mensual / 30) * dias_laborados - descuentos
+  // Fórmula exacta del Excel: =B/30*C+D-E
+  // Salario Semanal = (Salario_Mensual / 30 × Días_Laborados) + Bonos - Descuentos
   function calcularSalarioSemanal(emp: Empleado): number {
     const salario = parseFloat(String(emp.salarioMensual)) || 0;
     const dias = emp.diasLaborados ?? 0;
+    const bonos = parseFloat(String(emp.bonos)) || 0;
     const descuentos = parseFloat(String(emp.descuentosAdicionales)) || 0;
-    const bruto = (salario / 30) * dias;
-    return Math.max(0, bruto - descuentos);
+    const resultado = (salario / 30) * dias + bonos - descuentos;
+    return Math.max(0, resultado);
   }
 
   return (

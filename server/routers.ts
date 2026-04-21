@@ -198,6 +198,9 @@ export const appRouter = router({
             salarioAPagar: Math.max(0, salarioAPagar).toFixed(2),
           });
 
+          // Sincronizar días laborados (asistidos) al registro del empleado
+          await actualizarEmpleado(empleadoId, { diasLaborados: Math.max(0, diasAsistidos) } as any);
+
           resultados.push({
             nombre: empParsed.nombre,
             diasLaborables,
