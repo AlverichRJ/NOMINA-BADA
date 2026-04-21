@@ -161,6 +161,7 @@ export const appRouter = router({
             empleadoDB = empCreado;
           }
 
+          if (!empleadoDB) continue;
           const empleadoId = empleadoDB.id;
           const salario = parseFloat(empleadoDB.salarioMensual as string) || 0;
           const bonos = parseFloat(empleadoDB.bonos as string) || 0;

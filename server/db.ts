@@ -78,7 +78,22 @@ export async function getUserByOpenId(openId: string) {
 export async function getEmpleados() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(empleados).where(eq(empleados.activo, true)).orderBy(empleados.nombre);
+  // Incluir dias_falta del último período procesado
+  const conn = (db as any).session?.client || null;
+  // Usar query raw para el LEFT JOIN con calculos_nomina
+  const mysql2 = await import("mysql2/promise");
+  const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
+  const [rows] = await rawConn.execute(`
+    SELECT e.*,
+           COALESCE(cn.dias_falta, 0) as dias_falta_periodo
+    FROM empleados e
+    LEFT JOIN calculos_nomina cn ON cn.empleado_id = e.id
+      AND cn.periodo_id = (SELECT MAX(id) FROM periodos)
+    WHERE e.activo = 1
+    ORDER BY e.nombre
+  `) as any;
+  await rawConn.end();
+  return rows as (typeof empleados.$inferSelect & { dias_falta_periodo?: number })[];
 }
 
 export async function getEmpleadoById(id: number) {

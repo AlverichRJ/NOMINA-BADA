@@ -36,6 +36,7 @@ type Empleado = {
   bonos: string | number;
   diasLaborados?: number | null;
   descuentosAdicionales?: string | number | null;
+  dias_falta_periodo?: number | null;
 };
 
 // Celda editable inline
@@ -272,6 +273,9 @@ export default function Empleados() {
                     <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Salario Diario
                     </th>
+                    <th className="text-center px-4 py-3.5 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(0.50 0.18 25)" }}>
+                      Faltas
+                    </th>
                     <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         Días Laborados
@@ -326,6 +330,25 @@ export default function Empleados() {
                           <span className="text-sm text-muted-foreground">
                             {formatCurrency(salario / 30)}
                           </span>
+                        </td>
+
+                        {/* Faltas */}
+                        <td className="px-4 py-3.5 text-center">
+                          {(() => {
+                            const faltas = emp.dias_falta_periodo ?? 0;
+                            if (faltas === 0) return <span className="text-sm text-muted-foreground">—</span>;
+                            return (
+                              <span
+                                className="inline-flex items-center justify-center min-w-[1.75rem] h-7 px-2 rounded-full text-xs font-bold"
+                                style={{
+                                  background: faltas >= 5 ? "oklch(0.95 0.06 25)" : "oklch(0.97 0.03 50)",
+                                  color: faltas >= 5 ? "oklch(0.45 0.20 25)" : "oklch(0.50 0.15 50)",
+                                }}
+                              >
+                                {faltas}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Días Laborados — editable */}
@@ -401,7 +424,9 @@ export default function Empleados() {
                       <td className="px-4 py-3 text-xs font-bold uppercase text-muted-foreground" colSpan={2}>
                         Totales ({filtered.length} empleados)
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-muted-foreground">—</td>
+                      <td className="px-4 py-3 text-center text-xs font-semibold" style={{ color: "oklch(0.45 0.20 25)" }}>
+                        {filtered.reduce((s, e) => s + (e.dias_falta_periodo ?? 0), 0)}
+                      </td>
                       <td className="px-4 py-3 text-right text-xs font-semibold">
                         {filtered.reduce((s, e) => s + (e.diasLaborados ?? 0), 0)} días
                       </td>
