@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { generarPDF, generarExcel } from "../exportar";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,6 +45,31 @@ async function startServer() {
       createContext,
     })
   );
+  // Export routes
+  app.get("/api/export/pdf/:periodoId", async (req, res) => {
+    try {
+      const periodoId = parseInt(req.params.periodoId);
+      const buffer = await generarPDF(periodoId);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Reporte_${periodoId}.pdf"`);
+      res.send(buffer);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/export/xlsx/:periodoId", async (req, res) => {
+    try {
+      const periodoId = parseInt(req.params.periodoId);
+      const buffer = await generarExcel(periodoId);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="Reporte_${periodoId}.xlsx"`);
+      res.send(buffer);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

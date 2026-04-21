@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
@@ -43,20 +44,20 @@
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
+  --primary: oklch(0.22 0.06 240);
+  --primary-foreground: oklch(0.98 0.005 240);
+  --sidebar-primary: oklch(0.22 0.06 240);
+  --sidebar-primary-foreground: oklch(0.98 0.005 240);
   --chart-1: var(--color-blue-300);
   --chart-2: var(--color-blue-500);
   --chart-3: var(--color-blue-600);
   --chart-4: var(--color-blue-700);
   --chart-5: var(--color-blue-800);
   --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
+  --background: oklch(0.975 0.004 240);
+  --foreground: oklch(0.15 0.02 240);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
+  --card-foreground: oklch(0.15 0.02 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.235 0.015 65);
   --secondary: oklch(0.98 0.001 286.375);
@@ -119,6 +120,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -132,6 +139,19 @@
     @apply cursor-pointer;
   }
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.75 0.01 240); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.6 0.02 240); }
+
+/* Falta row highlight */
+.row-falta { background-color: oklch(0.97 0.04 25) !important; }
+.row-falta td { color: oklch(0.42 0.18 25) !important; font-weight: 500; }
+.badge-si { background: oklch(0.97 0.04 25); color: oklch(0.42 0.18 25); font-weight: 700; border: 1px solid oklch(0.85 0.08 25); padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; }
+.badge-no { background: oklch(0.95 0.05 145); color: oklch(0.38 0.15 145); font-weight: 600; border: 1px solid oklch(0.82 0.08 145); padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; }
+.badge-descanso { background: oklch(0.95 0.02 240); color: oklch(0.45 0.06 240); font-weight: 600; border: 1px solid oklch(0.85 0.04 240); padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; }
 
 @layer components {
   /**
