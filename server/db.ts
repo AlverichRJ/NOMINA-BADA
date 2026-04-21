@@ -84,14 +84,23 @@ export async function getEmpleados() {
   const mysql2 = await import("mysql2/promise");
   const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
   const [rows] = await rawConn.execute(`
-    SELECT e.*,
-           COALESCE((
-             SELECT cn.dias_falta
-             FROM calculos_nomina cn
-             WHERE cn.empleado_id = e.id
-               AND cn.periodo_id = (SELECT MAX(id) FROM periodos)
-             LIMIT 1
-           ), 0) as dias_falta_periodo
+    SELECT
+      e.id,
+      e.nombre,
+      e.salario_mensual  AS salarioMensual,
+      e.bonos,
+      e.dias_laborados   AS diasLaborados,
+      e.descuentos_adicionales AS descuentosAdicionales,
+      e.activo,
+      e.createdAt,
+      e.updatedAt,
+      COALESCE((
+        SELECT cn.dias_falta
+        FROM calculos_nomina cn
+        WHERE cn.empleado_id = e.id
+          AND cn.periodo_id = (SELECT MAX(id) FROM periodos)
+        LIMIT 1
+      ), 0) as dias_falta_periodo
     FROM empleados e
     WHERE e.activo = 1
     ORDER BY e.nombre
