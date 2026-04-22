@@ -56,9 +56,15 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (user.role !== undefined) {
     values.role = user.role;
     updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
+  } else {
+    // Auto-promover a admin si es el dueño del sistema
+    // Soporta tanto OWNER_EMAIL (servidor local) como OWNER_OPEN_ID (Manus)
+    const isOwnerByEmail = ENV.ownerEmail && user.email === ENV.ownerEmail;
+    const isOwnerByOpenId = ENV.ownerOpenId && user.openId === ENV.ownerOpenId;
+    if (isOwnerByEmail || isOwnerByOpenId) {
+      values.role = "admin";
+      updateSet.role = "admin";
+    }
   }
 
   if (!values.lastSignedIn) values.lastSignedIn = new Date();

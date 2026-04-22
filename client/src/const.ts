@@ -1,17 +1,16 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Generate login URL at runtime so redirect URI reflects the current origin.
-export const getLoginUrl = () => {
-  const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-  const appId = import.meta.env.VITE_APP_ID;
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
-
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
-
+/**
+ * Genera la URL de login de Google OAuth.
+ * Apunta a /api/oauth/google en el mismo servidor.
+ * El parámetro state se usa para redirigir al usuario de vuelta
+ * a la página que intentaba visitar antes de hacer login.
+ */
+export const getLoginUrl = (returnPath?: string): string => {
+  const state = returnPath || "/";
+  const url = new URL("/api/oauth/google", window.location.origin);
+  if (state !== "/") {
+    url.searchParams.set("state", state);
+  }
   return url.toString();
 };

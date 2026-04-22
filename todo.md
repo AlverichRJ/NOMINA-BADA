@@ -90,3 +90,14 @@
 - [x] Sidebar: ocultar opciones Cargar Reporte, Importar Salarios y Usuarios para no-admin
 - [x] Página Usuarios: listar todos los usuarios y permitir al admin cambiar roles
 - [x] Sidebar: agregar enlace a Usuarios (solo visible para admin)
+
+## Migración a Servidor Propio
+- [x] Reemplazar Manus OAuth por Google OAuth directo (passport-google-oauth20)
+- [x] Reemplazar Manus Storage S3 por almacenamiento local en disco
+- [x] Eliminar dependencias de Forge API (notificaciones no críticas)
+- [x] Actualizar env.ts para variables de entorno locales
+- [x] Crear env.template con todas las variables necesarias
+- [x] Script de build y deploy para servidor Ubuntu (deploy.sh)
+- [x] Configuración de Nginx como reverse proxy (nginx.conf)
+- [x] Configuración de PM2 para mantener el proceso activo (ecosystem.config.cjs)
+- [x] Documentación de instalación en README_SERVIDOR.md

@@ -5,14 +5,14 @@ import type { TrpcContext } from "./_core/context";
 vi.mock("./db", () => ({
   getAppConfig: vi.fn().mockResolvedValue([
     { key: "app_name", value: "TestApp", updatedAt: new Date() },
-    { key: "app_logo", value: "/manus-storage/app-logos/logo_abc123.png", updatedAt: new Date() },
+    { key: "app_logo", value: "/uploads/app-logos/logo_abc123.png", updatedAt: new Date() },
   ]),
   setAppConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock storage module
+// Mock storage module — ahora usa almacenamiento local (/uploads/)
 vi.mock("./storage", () => ({
-  storagePut: vi.fn().mockResolvedValue({ key: "app-logos/logo_abc123.png", url: "/manus-storage/app-logos/logo_abc123.png" }),
+  storagePut: vi.fn().mockResolvedValue({ key: "app-logos/logo_abc123.png", url: "/uploads/app-logos/logo_abc123.png" }),
 }));
 
 import { appRouter } from "./routers";
@@ -24,7 +24,7 @@ function createAuthContext(role: "user" | "admin" = "admin"): TrpcContext {
     openId: "test-user",
     email: "test@example.com",
     name: "Test User",
-    loginMethod: "manus",
+    loginMethod: "google",
     role,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -45,7 +45,7 @@ describe("config.get", () => {
     const result = await caller.config.get();
 
     expect(result).toHaveProperty("app_name", "TestApp");
-    expect(result).toHaveProperty("app_logo", "/manus-storage/app-logos/logo_abc123.png");
+    expect(result).toHaveProperty("app_logo", "/uploads/app-logos/logo_abc123.png");
   });
 });
 
@@ -63,7 +63,7 @@ describe("config.set", () => {
 });
 
 describe("config.uploadLogo", () => {
-  it("uploads logo to S3 and saves URL in DB", async () => {
+  it("uploads logo to local storage and saves URL in DB", async () => {
     const { storagePut } = await import("./storage");
     const { setAppConfig } = await import("./db");
     const ctx = createAuthContext();
@@ -75,9 +75,9 @@ describe("config.uploadLogo", () => {
     const result = await caller.config.uploadLogo({ dataUrl: minimalPng, mimeType: "image/png" });
 
     expect(result.success).toBe(true);
-    expect(result.url).toContain("/manus-storage/");
+    expect(result.url).toContain("/uploads/");
     expect(storagePut).toHaveBeenCalled();
-    expect(setAppConfig).toHaveBeenCalledWith("app_logo", expect.stringContaining("/manus-storage/"));
+    expect(setAppConfig).toHaveBeenCalledWith("app_logo", expect.stringContaining("/uploads/"));
   });
 
   it("throws error for invalid data URL format", async () => {
