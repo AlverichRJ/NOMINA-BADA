@@ -413,6 +413,26 @@ export const appRouter = router({
         return { total: resultados.length, resultados };
       }),
   }),
+
+  // ─── CONFIGURACIÓN DE LA APP ────────────────────────────────────────────────────────────
+  config: router({
+    get: publicProcedure.query(async () => {
+      const db = await import("./db");
+      const rows = await db.getAppConfig();
+      const result: Record<string, string> = {};
+      for (const row of rows) {
+        result[row.key] = row.value ?? "";
+      }
+      return result;
+    }),
+    set: protectedProcedure
+      .input(z.object({ key: z.string(), value: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await import("./db");
+        await db.setAppConfig(input.key, input.value);
+        return { success: true };
+      }),
+  }),
 });
 
 // ─── PARSER DE ARCHIVO DE SALARIOS ──────────────────────────────────────────────────────────────────────

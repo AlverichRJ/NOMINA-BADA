@@ -87,3 +87,14 @@ export const calculosNomina = mysqlTable("calculos_nomina", {
 
 export type CalculoNomina = typeof calculosNomina.$inferSelect;
 export type InsertCalculoNomina = typeof calculosNomina.$inferInsert;
+
+// Tabla de configuración de la app (nombre, logo, etc.)
+export const appConfig = mysqlTable("app_config", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AppConfig = typeof appConfig.$inferSelect;
+export type InsertAppConfig = typeof appConfig.$inferInsert;

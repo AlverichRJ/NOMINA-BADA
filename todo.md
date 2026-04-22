@@ -64,3 +64,8 @@
 ## Reportes - Gestión de Períodos
 - [x] Botón eliminar período en la página Reportes (sincronizado con Dashboard)
 - [x] Botón renombrar período en la página Reportes (edición inline, sincronizado con Dashboard)
+
+## Personalización de la App
+- [x] Nombre de la app editable desde el sidebar (clic para editar, se guarda en BD)
+- [x] Logo editable desde el sidebar (subir imagen, se guarda en BD como base64)
+- [x] Los cambios de nombre y logo persisten entre sesiones

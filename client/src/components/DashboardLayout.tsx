@@ -21,21 +21,26 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { trpc } from "@/lib/trpc";
 import {
   BarChart3,
   Building2,
-  FileText,
+  Check,
+  DollarSign,
   LayoutDashboard,
   LogOut,
   PanelLeft,
+  Pencil,
   Upload,
   Users,
-  DollarSign,
+  X,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { toast } from "sonner";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -119,6 +124,56 @@ function DashboardLayoutContent({
   const isMobile = useIsMobile();
   const activeMenuItem = menuItems.find((item) => item.path === location);
 
+  // Config de la app (nombre y logo)
+  const utils = trpc.useUtils();
+  const { data: config } = trpc.config.get.useQuery();
+  const setConfigMutation = trpc.config.set.useMutation({
+    onSuccess: () => utils.config.get.invalidate(),
+    onError: (e) => toast.error("Error al guardar: " + e.message),
+  });
+
+  const appName = config?.app_name || "NóminaApp";
+  const appLogo = config?.app_logo || "";
+
+  // Estado para editar nombre
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+
+  // Estado para editar logo
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleStartEditName = () => {
+    setNameValue(appName);
+    setEditingName(true);
+  };
+
+  const handleSaveName = () => {
+    if (!nameValue.trim()) return;
+    setConfigMutation.mutate({ key: "app_name", value: nameValue.trim() });
+    setEditingName(false);
+    toast.success("Nombre actualizado");
+  };
+
+  const handleCancelName = () => setEditingName(false);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("La imagen debe ser menor a 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setConfigMutation.mutate({ key: "app_logo", value: dataUrl });
+      toast.success("Logo actualizado");
+    };
+    reader.readAsDataURL(file);
+    // Reset input
+    e.target.value = "";
+  };
+
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -159,19 +214,76 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: "oklch(0.22 0.06 240)" }}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 group/header">
+                  {/* Logo */}
+                  <button
+                    className="relative shrink-0 group/logo"
+                    title="Cambiar logo"
+                    onClick={() => logoInputRef.current?.click()}
                   >
-                    <Building2 className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold truncate" style={{ color: "oklch(0.15 0.02 240)" }}>
-                      NóminaApp
-                    </p>
-                    <p className="text-[10px] text-muted-foreground truncate">Gestión Empresarial</p>
-                  </div>
+                    {appLogo ? (
+                      <img
+                        src={appLogo}
+                        alt="Logo"
+                        className="w-7 h-7 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: "oklch(0.22 0.06 240)" }}
+                      >
+                        <Building2 className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center">
+                      <Upload className="w-3 h-3 text-white" />
+                    </div>
+                  </button>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoChange}
+                  />
+
+                  {/* Nombre editable */}
+                  {editingName ? (
+                    <div className="flex items-center gap-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={nameValue}
+                        onChange={(e) => setNameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveName();
+                          if (e.key === "Escape") handleCancelName();
+                        }}
+                        className="h-6 text-xs px-1 flex-1"
+                        autoFocus
+                      />
+                      <button onClick={handleSaveName} className="text-green-600 hover:text-green-700">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={handleCancelName} className="text-muted-foreground hover:text-foreground">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="min-w-0 flex-1 flex items-center gap-1 group/name">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate" style={{ color: "oklch(0.15 0.02 240)" }}>
+                          {appName}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate">Gestión Empresarial</p>
+                      </div>
+                      <button
+                        onClick={handleStartEditName}
+                        className="opacity-0 group-hover/header:opacity-100 transition-opacity text-muted-foreground hover:text-foreground ml-1 shrink-0"
+                        title="Editar nombre"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

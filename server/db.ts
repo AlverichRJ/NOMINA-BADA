@@ -7,6 +7,7 @@ import {
   empleados,
   periodos,
   users,
+  appConfig,
   type Empleado,
   type InsertAsistencia,
   type InsertCalculoNomina,
@@ -244,4 +245,16 @@ export async function eliminarCalculosPeriodo(periodoId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB no disponible");
   return db.delete(calculosNomina).where(eq(calculosNomina.periodoId, periodoId));
+}
+
+export async function getAppConfig() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(appConfig);
+}
+
+export async function setAppConfig(key: string, value: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB no disponible");
+  return db.insert(appConfig).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
 }
