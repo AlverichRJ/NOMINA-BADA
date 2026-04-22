@@ -60,3 +60,7 @@
 - [x] Botón eliminar período en la lista de Períodos Recientes (con confirmación)
 - [x] Botón renombrar período (edición inline)
 - [x] Total Nómina en Dashboard calculado con salarios reales de empleados
+
+## Reportes - Gestión de Períodos
+- [x] Botón eliminar período en la página Reportes (sincronizado con Dashboard)
+- [x] Botón renombrar período en la página Reportes (edición inline, sincronizado con Dashboard)
