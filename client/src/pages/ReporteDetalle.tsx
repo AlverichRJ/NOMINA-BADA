@@ -370,7 +370,7 @@ export default function ReporteDetalle() {
                               </td>
                               <td className="px-4 py-2.5 text-center">
                                 {isDescanso ? (
-                                  "—"
+                                  <span className="badge-descanso">Descanso</span>
                                 ) : isFalta ? (
                                   <span className="badge-si">Falta</span>
                                 ) : a.salida ? (
