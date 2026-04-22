@@ -164,6 +164,18 @@ export async function crearPeriodo(data: InsertPeriodo) {
   return result;
 }
 
+export async function deletePeriodo(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB no disponible");
+  return db.delete(periodos).where(eq(periodos.id, id));
+}
+
+export async function renamePeriodo(id: number, nombre: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB no disponible");
+  return db.update(periodos).set({ nombre }).where(eq(periodos.id, id));
+}
+
 // ─── ASISTENCIAS ──────────────────────────────────────────────────────────────
 
 export async function getAsistenciasByPeriodo(periodoId: number) {

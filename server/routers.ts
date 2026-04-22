@@ -12,6 +12,8 @@ import {
   getPeriodos,
   getPeriodoById,
   crearPeriodo,
+  deletePeriodo,
+  renamePeriodo,
   getAsistenciasByPeriodo,
   getAsistenciasByEmpleadoPeriodo,
   insertarAsistencias,
@@ -101,6 +103,23 @@ export const appRouter = router({
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return getPeriodoById(input.id);
     }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        // Eliminar datos relacionados primero
+        await eliminarAsistenciasPeriodo(input.id);
+        await eliminarCalculosPeriodo(input.id);
+        await deletePeriodo(input.id);
+        return { success: true };
+      }),
+
+    rename: protectedProcedure
+      .input(z.object({ id: z.number(), nombre: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await renamePeriodo(input.id, input.nombre);
+        return { success: true };
+      }),
   }),
 
   // ─── REPORTES ──────────────────────────────────────────────────────────────

@@ -1,9 +1,12 @@
 import { trpc } from "@/lib/trpc";
-import { BarChart3, Building2, FileText, TrendingDown, Users, AlertTriangle, Upload, ArrowRight } from "lucide-react";
+import { BarChart3, FileText, TrendingDown, Users, AlertTriangle, Upload, ArrowRight, Trash2, Pencil, Check, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { toast } from "sonner";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
@@ -11,6 +14,8 @@ function formatCurrency(amount: number) {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+
   const { data: empleados, isLoading: loadingEmp } = trpc.empleados.list.useQuery();
   const { data: periodos, isLoading: loadingPer } = trpc.periodos.list.useQuery();
 
@@ -19,6 +24,52 @@ export default function Dashboard() {
     { periodoId: ultimoPeriodo?.id ?? 0 },
     { enabled: !!ultimoPeriodo?.id }
   );
+
+  // Estado para renombrar
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // Mutaciones
+  const deleteMutation = trpc.periodos.delete.useMutation({
+    onSuccess: () => {
+      utils.periodos.list.invalidate();
+      utils.reportes.getReportePeriodo.invalidate();
+      toast.success("Reporte eliminado correctamente");
+    },
+    onError: (e) => toast.error("Error al eliminar: " + e.message),
+  });
+
+  const renameMutation = trpc.periodos.rename.useMutation({
+    onSuccess: () => {
+      utils.periodos.list.invalidate();
+      setRenamingId(null);
+      toast.success("Reporte renombrado correctamente");
+    },
+    onError: (e) => toast.error("Error al renombrar: " + e.message),
+  });
+
+  const handleDelete = (e: React.MouseEvent, id: number, nombre: string) => {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar el reporte "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    deleteMutation.mutate({ id });
+  };
+
+  const handleStartRename = (e: React.MouseEvent, id: number, nombre: string) => {
+    e.stopPropagation();
+    setRenamingId(id);
+    setRenameValue(nombre);
+  };
+
+  const handleConfirmRename = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (!renameValue.trim()) return;
+    renameMutation.mutate({ id, nombre: renameValue.trim() });
+  };
+
+  const handleCancelRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(null);
+  };
 
   const totalEmpleados = empleados?.length ?? 0;
   const totalPeriodos = periodos?.length ?? 0;
@@ -29,9 +80,21 @@ export default function Dashboard() {
     (sum, c) => sum + parseFloat(c.descuento as string || "0"), 0
   ) ?? 0;
 
-  const totalNomina = reporteData?.calculos.reduce(
-    (sum, c) => sum + parseFloat(c.salarioAPagar as string || "0"), 0
-  ) ?? 0;
+  // Total nómina: suma de (salario/30 * dias_laborados + bonos - descuentos) de todos los empleados del período
+  const totalNomina = (() => {
+    if (!reporteData || !empleados) return 0;
+    return reporteData.calculos.reduce((sum, c) => {
+      const emp = empleados.find((e) => e.id === c.empleadoId);
+      if (!emp) return sum + parseFloat(c.salarioAPagar as string || "0");
+      const salarioMensual = parseFloat(emp.salarioMensual as string || "0");
+      const bonos = parseFloat(emp.bonos as string || "0");
+      const diasLaborados = emp.diasLaborados ?? c.diasAsistidos ?? 0;
+      const descuentosAdicionales = parseFloat(emp.descuentosAdicionales as string || "0");
+      const descuento = parseFloat(c.descuento as string || "0");
+      const salario = (salarioMensual / 30) * diasLaborados + bonos - descuento - descuentosAdicionales;
+      return sum + Math.max(0, salario);
+    }, 0);
+  })();
 
   const stats = [
     {
@@ -166,10 +229,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="text-right shrink-0 ml-3">
-                      <span
-                        className="text-sm font-bold"
-                        style={{ color: "oklch(0.45 0.18 25)" }}
-                      >
+                      <span className="text-sm font-bold" style={{ color: "oklch(0.45 0.18 25)" }}>
                         {emp.diasFalta} {emp.diasFalta === 1 ? "falta" : "faltas"}
                       </span>
                       <p className="text-xs text-muted-foreground">
@@ -226,18 +286,80 @@ export default function Dashboard() {
                 {periodos?.slice(0, 5).map((periodo) => (
                   <div
                     key={periodo.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:border-border cursor-pointer transition-colors"
-                    onClick={() => setLocation(`/reportes/${periodo.id}`)}
+                    className="flex items-center gap-2 p-3 rounded-lg border border-border/40 hover:border-border transition-colors group"
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "oklch(0.15 0.02 240)" }}>
-                        {periodo.nombre}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {periodo.archivoNombre || "Archivo cargado"}
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
+                    {renamingId === periodo.id ? (
+                      /* Modo edición de nombre */
+                      <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") renameMutation.mutate({ id: periodo.id, nombre: renameValue.trim() });
+                            if (e.key === "Escape") setRenamingId(null);
+                          }}
+                          className="h-7 text-sm flex-1"
+                          autoFocus
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-green-600 hover:text-green-700"
+                          onClick={(e) => handleConfirmRename(e, periodo.id)}
+                          disabled={renameMutation.isPending}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-muted-foreground"
+                          onClick={handleCancelRename}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      /* Modo normal */
+                      <>
+                        <div
+                          className="min-w-0 flex-1 cursor-pointer"
+                          onClick={() => setLocation(`/reportes/${periodo.id}`)}
+                        >
+                          <p className="text-sm font-medium truncate" style={{ color: "oklch(0.15 0.02 240)" }}>
+                            {periodo.nombre}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {periodo.archivoNombre || "Archivo cargado"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Renombrar"
+                            onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                            title="Eliminar"
+                            onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <ArrowRight
+                            className="w-4 h-4 text-muted-foreground cursor-pointer"
+                            onClick={() => setLocation(`/reportes/${periodo.id}`)}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

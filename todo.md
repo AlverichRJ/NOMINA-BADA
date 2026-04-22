@@ -55,3 +55,8 @@
 - [x] Soporte para formato: Nombre, Salario Mensual (CSV y Excel .xlsx)
 - [x] Al importar: actualizar salario de empleados existentes y crear nuevos si no existen
 - [x] Plantilla descargable de ejemplo para que el usuario sepa el formato esperado
+
+## Dashboard - Gestión de Períodos
+- [x] Botón eliminar período en la lista de Períodos Recientes (con confirmación)
+- [x] Botón renombrar período (edición inline)
+- [x] Total Nómina en Dashboard calculado con salarios reales de empleados
