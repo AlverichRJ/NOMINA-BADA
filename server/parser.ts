@@ -59,9 +59,22 @@ function convertirHora12(horaStr: string): string {
 }
 
 function extraerHoras(linea: string): string[] {
-  // Extrae todas las horas en formato h:mmam o h:mmpm de una línea
-  const regex = /\d{1,2}:\d{2}(?:am|pm)/gi;
-  return (linea.match(regex) || []).map(convertirHora12);
+  // El formato del TXT pega el año (2 dígitos) directamente con la hora: "268:50am"
+  // Para separar correctamente: primero eliminar el patrón de fecha (dd/mes/AA) de la línea
+  // y luego extraer horas del resto
+  // Reemplazar el patrón de fecha para que el año no interfiera con la hora
+  const lineaSinFecha = linea.replace(/\d{1,2}\/[a-záéíóú]+\/(\d{2})/gi, (match, anio) => {
+    // Reemplazar el año con un marcador que no sea dígito
+    return match.slice(0, -anio.length) + 'XX';
+  });
+  // Ahora extraer horas: el año fue reemplazado por 'XX' por lo que '8:50am' ya no tiene dígitos antes
+  const regex = /(?<!\d)(\d{1,2}):(\d{2})(am|pm)/gi;
+  const resultados: string[] = [];
+  let matchResult: RegExpExecArray | null;
+  while ((matchResult = regex.exec(lineaSinFecha)) !== null) {
+    resultados.push(convertirHora12(`${matchResult[1]}:${matchResult[2]}${matchResult[3]}`));
+  }
+  return resultados;
 }
 
 /**
@@ -80,7 +93,8 @@ export function parsearArchivo(contenido: string): ParseResult {
   const reEmpleado = /^\s*\(\d+\)\s+(.+?)\s*$/;
 
   // Regex para detectar línea de fecha corta: "lun. 1/abr/26..." o "mié. 1/abr/268:54am..."
-  // IMPORTANTE: el año es exactamente 2 dígitos (26 = 2026), seguido de hora o fin
+  // IMPORTANTE: el año es exactamente 2 dígitos (26 = 2026), seguido de hora (1-2 dígitos + colon) o espacio o fin
+  // El lookahead (?=\d{1,2}:) captura cuando la hora va pegada al año (ej: 268:50am -> año=26, hora=8:50am)
   const reFechaCorta = /^\s*(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)\.\s+(\d{1,2})\/([a-záéíóú]+)\/(\d{2})(?=\d{1,2}:|\s|$)/i;
 
   // Regex para detectar línea de estado: "lunes 1/abr/26Asistido..." o "miércoles 15/abr/26Falta..."
