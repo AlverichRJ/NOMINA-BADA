@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import {
   getEmpleados,
@@ -22,6 +22,8 @@ import {
   upsertCalculoNomina,
   eliminarCalculosPeriodo,
   getEmpleadoByNombre,
+  getAllUsers,
+  updateUserRole,
 } from "./db";
 import { parsearArchivo, calcularDescuento, calcularSalarioAPagar, esDomingo } from "./parser";
 
@@ -48,7 +50,7 @@ export const appRouter = router({
       return getEmpleadoById(input.id);
     }),
 
-    create: publicProcedure
+    create: adminProcedure
       .input(
         z.object({
           nombre: z.string().min(1),
@@ -65,7 +67,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    update: publicProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -88,7 +90,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: publicProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await eliminarEmpleado(input.id);
@@ -106,7 +108,7 @@ export const appRouter = router({
       return getPeriodoById(input.id);
     }),
 
-    delete: protectedProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         // Eliminar datos relacionados primero
@@ -116,7 +118,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    rename: protectedProcedure
+    rename: adminProcedure
       .input(z.object({ id: z.number(), nombre: z.string().min(1) }))
       .mutation(async ({ input }) => {
         await renamePeriodo(input.id, input.nombre);
@@ -126,7 +128,7 @@ export const appRouter = router({
 
   // ─── REPORTES ──────────────────────────────────────────────────────────────
   reportes: router({
-    procesarArchivo: publicProcedure
+    procesarArchivo: adminProcedure
       .input(
         z.object({
           contenido: z.string(),
@@ -348,7 +350,7 @@ export const appRouter = router({
   // ─── IMPORTACIÓN DE SALARIOS ──────────────────────────────────────────────────────────────────────
   salarios: router({
     // Previsualizar los datos del archivo antes de importar
-    preview: publicProcedure
+    preview: adminProcedure
       .input(z.object({ contenido: z.string(), formato: z.enum(["csv", "xlsx_base64"]) }))
       .mutation(async ({ input }) => {
         const filas = parsearArchivoSalarios(input.contenido, input.formato);
@@ -356,7 +358,7 @@ export const appRouter = router({
       }),
 
     // Confirmar e importar los salarios a la BD
-    importar: publicProcedure
+    importar: adminProcedure
       .input(
         z.object({
           filas: z.array(
@@ -427,14 +429,14 @@ export const appRouter = router({
       }
       return result;
     }),
-    set: protectedProcedure
+    set: adminProcedure
       .input(z.object({ key: z.string(), value: z.string() }))
       .mutation(async ({ input }) => {
         const db = await import("./db");
         await db.setAppConfig(input.key, input.value);
         return { success: true };
       }),
-    uploadLogo: protectedProcedure
+    uploadLogo: adminProcedure
       .input(z.object({
         // base64 data URL: "data:image/png;base64,..."
         dataUrl: z.string().min(1),
@@ -463,9 +465,32 @@ export const appRouter = router({
         return { success: true, url };
       }),
   }),
+
+  // ─── USUARIOS (solo admin) ──────────────────────────────────────────────────
+  usuarios: router({
+    list: adminProcedure.query(async () => {
+      return getAllUsers();
+    }),
+
+    updateRole: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        role: z.enum(["user", "admin"]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // No permitir que el admin se quite su propio rol
+        if (ctx.user.id === input.id && input.role !== "admin") {
+          throw new Error("No puedes quitarte el rol de admin a ti mismo");
+        }
+        await updateUserRole(input.id, input.role);
+        return { success: true };
+      }),
+  }),
 });
 
-// ─── PARSER DE ARCHIVO DE SALARIOS ──────────────────────────────────────────────────────────────────────
+export type AppRouter = typeof appRouter;
+
+// ─── PARSER DE ARCHIVO DE SALARIOS ─────────────────────────────────────────────────────────────────────
 function parsearArchivoSalarios(contenido: string, formato: "csv" | "xlsx_base64"): Array<{ nombre: string; salarioMensual: number; bonos: number }> {
   if (formato === "csv") {
     const lineas = contenido.split(/\r?\n/).filter((l) => l.trim());
@@ -501,4 +526,3 @@ function parsearArchivoSalarios(contenido: string, formato: "csv" | "xlsx_base64
   }
 }
 
-export type AppRouter = typeof appRouter;

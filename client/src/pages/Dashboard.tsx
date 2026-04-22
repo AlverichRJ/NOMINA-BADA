@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { usePeriodoActivo } from "@/contexts/PeriodoActivoContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
@@ -16,6 +17,8 @@ function formatCurrency(amount: number) {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { periodoActivoId, setPeriodoActivo } = usePeriodoActivo();
 
   const { data: empleados, isLoading: loadingEmp } = trpc.empleados.list.useQuery();
@@ -380,25 +383,29 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                              title="Renombrar"
-                              onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                              title="Eliminar"
-                              onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            {isAdmin && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  title="Renombrar"
+                                  onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                  title="Eliminar"
+                                  onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </>
+                            )}
                             <ArrowRight
                               className="w-4 h-4 text-muted-foreground cursor-pointer"
                               onClick={(e) => { e.stopPropagation(); setLocation(`/reportes/${periodo.id}`); }}

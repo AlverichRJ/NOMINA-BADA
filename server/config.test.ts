@@ -18,14 +18,14 @@ vi.mock("./storage", () => ({
 import { appRouter } from "./routers";
 import type { AuthenticatedUser } from "./_core/context";
 
-function createAuthContext(): TrpcContext {
+function createAuthContext(role: "user" | "admin" = "admin"): TrpcContext {
   const user = {
     id: 1,
     openId: "test-user",
     email: "test@example.com",
     name: "Test User",
     loginMethod: "manus",
-    role: "user" as const,
+    role,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),

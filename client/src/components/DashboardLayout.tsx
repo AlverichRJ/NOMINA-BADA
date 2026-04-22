@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { ShieldCheck, UserCog } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -42,12 +43,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Empleados", path: "/empleados" },
-  { icon: DollarSign, label: "Importar Salarios", path: "/importar-salarios" },
-  { icon: Upload, label: "Cargar Reporte", path: "/cargar" },
-  { icon: BarChart3, label: "Reportes", path: "/reportes" },
+const allMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", adminOnly: false },
+  { icon: Users, label: "Empleados", path: "/empleados", adminOnly: false },
+  { icon: DollarSign, label: "Importar Salarios", path: "/importar-salarios", adminOnly: true },
+  { icon: Upload, label: "Cargar Reporte", path: "/cargar", adminOnly: true },
+  { icon: BarChart3, label: "Reportes", path: "/reportes", adminOnly: false },
+  { icon: UserCog, label: "Usuarios", path: "/usuarios", adminOnly: true },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -116,6 +118,8 @@ function DashboardLayoutContent({
   setSidebarWidth: (w: number) => void;
 }) {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const menuItems = allMenuItems.filter((item) => !item.adminOnly || isAdmin);
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -226,47 +230,46 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed && (
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 group/header">
-                  {/* Logo */}
-                  <button
-                    className="relative shrink-0 group/logo"
-                    title={uploadingLogo ? "Subiendo..." : "Cambiar logo"}
-                    onClick={() => !uploadingLogo && logoInputRef.current?.click()}
-                    disabled={uploadingLogo}
-                  >
-                    {appLogo ? (
-                      <img
-                        src={appLogo}
-                        alt="Logo"
-                        className="w-7 h-7 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: "oklch(0.22 0.06 240)" }}
-                      >
-                        <Building2 className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    {uploadingLogo ? (
-                      <div className="absolute inset-0 rounded-lg bg-black/60 flex items-center justify-center">
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center">
-                        <Upload className="w-3 h-3 text-white" />
-                      </div>
-                    )}
-                  </button>
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoChange}
-                  />
+                  {/* Logo — solo admin puede cambiarlo */}
+                  {isAdmin ? (
+                    <button
+                      className="relative shrink-0 group/logo"
+                      title={uploadingLogo ? "Subiendo..." : "Cambiar logo"}
+                      onClick={() => !uploadingLogo && logoInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {appLogo ? (
+                        <img src={appLogo} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.22 0.06 240)" }}>
+                          <Building2 className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      {uploadingLogo ? (
+                        <div className="absolute inset-0 rounded-lg bg-black/60 flex items-center justify-center">
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center">
+                          <Upload className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="shrink-0">
+                      {appLogo ? (
+                        <img src={appLogo} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.22 0.06 240)" }}>
+                          <Building2 className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
 
-                  {/* Nombre editable */}
-                  {editingName ? (
+                  {/* Nombre — solo admin puede editarlo */}
+                  {isAdmin && editingName ? (
                     <div className="flex items-center gap-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
                       <Input
                         value={nameValue}
@@ -293,13 +296,15 @@ function DashboardLayoutContent({
                         </p>
                         <p className="text-[10px] text-muted-foreground truncate">Gestión Empresarial</p>
                       </div>
-                      <button
-                        onClick={handleStartEditName}
-                        className="opacity-0 group-hover/header:opacity-100 transition-opacity text-muted-foreground hover:text-foreground ml-1 shrink-0"
-                        title="Editar nombre"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={handleStartEditName}
+                          className="opacity-0 group-hover/header:opacity-100 transition-opacity text-muted-foreground hover:text-foreground ml-1 shrink-0"
+                          title="Editar nombre"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

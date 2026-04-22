@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { usePeriodoActivo } from "@/contexts/PeriodoActivoContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +123,8 @@ function EditableCell({
 
 export default function Empleados() {
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { periodoActivoId, setPeriodoActivo } = usePeriodoActivo();
   const { data: periodos } = trpc.periodos.list.useQuery();
   const periodoActivo = periodos?.find((p) => p.id === periodoActivoId) ?? periodos?.[0] ?? null;
@@ -249,14 +252,16 @@ export default function Empleados() {
             </div>
           )}
         </div>
-        <Button
-          onClick={openCreate}
-          className="gap-2"
-          style={{ background: "oklch(0.22 0.06 240)", color: "white" }}
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Empleado
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={openCreate}
+            className="gap-2"
+            style={{ background: "oklch(0.22 0.06 240)", color: "white" }}
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Empleado
+          </Button>
+        )}
       </div>
 
       {/* Search + Stats */}
@@ -276,11 +281,13 @@ export default function Empleados() {
         </Badge>
       </div>
 
-      {/* Leyenda */}
-      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-        <Edit2 className="w-3 h-3" />
-        Las columnas <strong>Días Laborados</strong> y <strong>Descuentos</strong> son editables directamente en la tabla. Haz clic sobre el valor para modificarlo.
-      </p>
+      {/* Leyenda — solo admin */}
+      {isAdmin && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Edit2 className="w-3 h-3" />
+          Las columnas <strong>Días Laborados</strong> y <strong>Descuentos</strong> son editables directamente en la tabla. Haz clic sobre el valor para modificarlo.
+        </p>
+      )}
 
       {/* Table */}
       <Card className="border border-border/60 shadow-sm">
@@ -323,21 +330,23 @@ export default function Empleados() {
                     <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         Días Laborados
-                        <Edit2 className="w-3 h-3 text-primary/60" />
+                        {isAdmin && <Edit2 className="w-3 h-3 text-primary/60" />}
                       </span>
                     </th>
                     <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         Descuentos
-                        <Edit2 className="w-3 h-3 text-primary/60" />
+                        {isAdmin && <Edit2 className="w-3 h-3 text-primary/60" />}
                       </span>
                     </th>
                     <th className="text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider" style={{ color: "oklch(0.35 0.12 145)" }}>
                       Salario Semanal
                     </th>
-                    <th className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
-                      Acciones
-                    </th>
+                    {isAdmin && (
+                      <th className="px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground text-center">
+                        Acciones
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -395,32 +404,36 @@ export default function Empleados() {
                           })()}
                         </td>
 
-                        {/* Días Laborados — editable */}
+                        {/* Días Laborados */}
                         <td className="px-4 py-3.5">
-                          <EditableCell
-                            value={diasLaborados}
-                            type="number"
-                            format={(v) => `${v} días`}
-                            onSave={(val) =>
-                              updateMutation.mutate({ id: emp.id, diasLaborados: Math.round(val) })
-                            }
-                          />
+                          {isAdmin ? (
+                            <EditableCell
+                              value={diasLaborados}
+                              type="number"
+                              format={(v) => `${v} días`}
+                              onSave={(val) =>
+                                updateMutation.mutate({ id: emp.id, diasLaborados: Math.round(val) })
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm text-right block">{diasLaborados} días</span>
+                          )}
                         </td>
 
-                        {/* Descuentos — editable */}
+                        {/* Descuentos */}
                         <td className="px-4 py-3.5">
-                          <EditableCell
-                            value={descuentos}
-                            type="number"
-                            format={(v) =>
-                              v > 0 ? (
-                                formatCurrency(v)
-                              ) : "—"
-                            }
-                            onSave={(val) =>
-                              updateMutation.mutate({ id: emp.id, descuentosAdicionales: val })
-                            }
-                          />
+                          {isAdmin ? (
+                            <EditableCell
+                              value={descuentos}
+                              type="number"
+                              format={(v) => v > 0 ? formatCurrency(v) : "—"}
+                              onSave={(val) =>
+                                updateMutation.mutate({ id: emp.id, descuentosAdicionales: val })
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm text-right block">{descuentos > 0 ? formatCurrency(descuentos) : "—"}</span>
+                          )}
                         </td>
 
                         {/* Salario Semanal — calculado */}
@@ -433,29 +446,31 @@ export default function Empleados() {
                           </span>
                         </td>
 
-                        {/* Acciones */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEdit(emp)}
-                              className="h-8 w-8 p-0"
-                              title="Editar nombre y salario"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteId(emp.id)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              title="Eliminar empleado"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
+                        {/* Acciones — solo admin */}
+                        {isAdmin && (
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEdit(emp)}
+                                className="h-8 w-8 p-0"
+                                title="Editar nombre y salario"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteId(emp.id)}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                title="Eliminar empleado"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

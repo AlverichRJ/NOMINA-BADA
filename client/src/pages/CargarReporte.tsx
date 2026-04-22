@@ -1,13 +1,32 @@
 import { trpc } from "@/lib/trpc";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, FileText, Loader2, Upload, X } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Upload, X, Lock } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function CargarReporte() {
   const [, setLocation] = useLocation();
+  const { user, loading } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    if (!loading && user && !isAdmin) {
+      setLocation("/");
+    }
+  }, [user, loading, isAdmin, setLocation]);
+
+  if (!loading && user && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Lock className="w-12 h-12 text-muted-foreground opacity-40" />
+        <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
+      </div>
+    );
+  }
+
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<{

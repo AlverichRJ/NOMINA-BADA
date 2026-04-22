@@ -7,10 +7,13 @@ import { ArrowRight, BarChart3, Calendar, Upload, Pencil, Trash2, Check, X, Chec
 import { useState } from "react";
 import { toast } from "sonner";
 import { usePeriodoActivo } from "@/contexts/PeriodoActivoContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Reportes() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { periodoActivoId, setPeriodoActivo } = usePeriodoActivo();
   const { data: periodos, isLoading } = trpc.periodos.list.useQuery();
 
@@ -78,14 +81,16 @@ export default function Reportes() {
             Historial de períodos procesados. Haz clic en un período para seleccionarlo como activo.
           </p>
         </div>
-        <Button
-          onClick={() => setLocation("/cargar")}
-          className="gap-2"
-          style={{ background: "oklch(0.22 0.06 240)", color: "white" }}
-        >
-          <Upload className="w-4 h-4" />
-          Cargar Nuevo
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={() => setLocation("/cargar")}
+            className="gap-2"
+            style={{ background: "oklch(0.22 0.06 240)", color: "white" }}
+          >
+            <Upload className="w-4 h-4" />
+            Cargar Nuevo
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -219,25 +224,29 @@ export default function Reportes() {
                             </Button>
                           )}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              title="Renombrar"
-                              onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                              title="Eliminar"
-                              onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {isAdmin && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                  title="Renombrar"
+                                  onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                                  title="Eliminar"
+                                  onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                             <Button
                               size="icon"
                               variant="ghost"

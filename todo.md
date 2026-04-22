@@ -79,3 +79,14 @@
 - [x] Empleados: faltas y días laborados del período activo (badge indicador del período activo)
 - [x] Reportes: período activo resaltado en la lista (badge ACTIVO + fondo azul + ícono checkmark)
 - [x] Selector de período visible en todas las páginas relevantes (Dashboard, Reportes, Empleados)
+
+## Control de Acceso por Roles
+- [x] isAdmin derivado de user.role === 'admin' en cada componente
+- [x] Proteger procedimientos de escritura con adminProcedure en el backend
+- [x] Dashboard: ocultar botones Renombrar/Eliminar períodos para no-admin
+- [x] Empleados: ocultar celdas editables (diasLaborados, descuentos) para no-admin
+- [x] Empleados: ocultar botón Nuevo Empleado, Editar y Eliminar para no-admin
+- [x] Reportes: ocultar botones Renombrar/Eliminar y Cargar Nuevo para no-admin
+- [x] Sidebar: ocultar opciones Cargar Reporte, Importar Salarios y Usuarios para no-admin
+- [x] Página Usuarios: listar todos los usuarios y permitir al admin cambiar roles
+- [x] Sidebar: agregar enlace a Usuarios (solo visible para admin)

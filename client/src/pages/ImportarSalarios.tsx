@@ -3,8 +3,11 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download, X, ArrowRight } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download, X, ArrowRight, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 type FilaPreview = {
   nombre: string;
@@ -17,6 +20,25 @@ function formatCurrency(n: number) {
 }
 
 export default function ImportarSalarios() {
+  const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
+  const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    if (!loading && user && !isAdmin) {
+      setLocation("/");
+    }
+  }, [user, loading, isAdmin, setLocation]);
+
+  if (!loading && user && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Lock className="w-12 h-12 text-muted-foreground opacity-40" />
+        <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
+      </div>
+    );
+  }
+
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
