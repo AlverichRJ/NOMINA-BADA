@@ -67,5 +67,6 @@
 
 ## Personalización de la App
 - [x] Nombre de la app editable desde el sidebar (clic para editar, se guarda en BD)
-- [x] Logo editable desde el sidebar (subir imagen, se guarda en BD como base64)
+- [x] Logo editable desde el sidebar (subir imagen, se sube a S3 y se guarda URL en BD)
+- [x] Fix bug: error al cambiar logo (base64 demasiado grande para TEXT) — ahora usa S3 storage
 - [x] Los cambios de nombre y logo persisten entre sesiones

@@ -432,6 +432,34 @@ export const appRouter = router({
         await db.setAppConfig(input.key, input.value);
         return { success: true };
       }),
+    uploadLogo: protectedProcedure
+      .input(z.object({
+        // base64 data URL: "data:image/png;base64,..."
+        dataUrl: z.string().min(1),
+        mimeType: z.string().default("image/png"),
+      }))
+      .mutation(async ({ input }) => {
+        const { storagePut } = await import("./storage");
+        const db = await import("./db");
+
+        // Extraer los bytes del data URL base64
+        const matches = input.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) throw new Error("Formato de imagen inválido");
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, "base64");
+
+        // Determinar extensión
+        const ext = mimeType.includes("png") ? "png" : mimeType.includes("gif") ? "gif" : mimeType.includes("webp") ? "webp" : "jpg";
+        const key = `app-logos/logo.${ext}`;
+
+        // Subir a S3
+        const { url } = await storagePut(key, buffer, mimeType);
+
+        // Guardar URL en app_config
+        await db.setAppConfig("app_logo", url);
+        return { success: true, url };
+      }),
   }),
 });
 

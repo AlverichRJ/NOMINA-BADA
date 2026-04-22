@@ -131,6 +131,13 @@ function DashboardLayoutContent({
     onSuccess: () => utils.config.get.invalidate(),
     onError: (e) => toast.error("Error al guardar: " + e.message),
   });
+  const uploadLogoMutation = trpc.config.uploadLogo.useMutation({
+    onSuccess: () => {
+      utils.config.get.invalidate();
+      toast.success("Logo actualizado");
+    },
+    onError: (e) => toast.error("Error al subir logo: " + e.message),
+  });
 
   const appName = config?.app_name || "NóminaApp";
   const appLogo = config?.app_logo || "";
@@ -138,6 +145,7 @@ function DashboardLayoutContent({
   // Estado para editar nombre
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Estado para editar logo
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -159,15 +167,18 @@ function DashboardLayoutContent({
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("La imagen debe ser menor a 2MB");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La imagen debe ser menor a 5MB");
       return;
     }
+    setUploadingLogo(true);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
-      setConfigMutation.mutate({ key: "app_logo", value: dataUrl });
-      toast.success("Logo actualizado");
+      uploadLogoMutation.mutate(
+        { dataUrl, mimeType: file.type || "image/png" },
+        { onSettled: () => setUploadingLogo(false) }
+      );
     };
     reader.readAsDataURL(file);
     // Reset input
@@ -218,8 +229,9 @@ function DashboardLayoutContent({
                   {/* Logo */}
                   <button
                     className="relative shrink-0 group/logo"
-                    title="Cambiar logo"
-                    onClick={() => logoInputRef.current?.click()}
+                    title={uploadingLogo ? "Subiendo..." : "Cambiar logo"}
+                    onClick={() => !uploadingLogo && logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
                   >
                     {appLogo ? (
                       <img
@@ -235,9 +247,15 @@ function DashboardLayoutContent({
                         <Building2 className="w-4 h-4 text-white" />
                       </div>
                     )}
-                    <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center">
-                      <Upload className="w-3 h-3 text-white" />
-                    </div>
+                    {uploadingLogo ? (
+                      <div className="absolute inset-0 rounded-lg bg-black/60 flex items-center justify-center">
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 rounded-lg bg-black/40 opacity-0 group-hover/logo:opacity-100 transition-opacity flex items-center justify-center">
+                        <Upload className="w-3 h-3 text-white" />
+                      </div>
+                    )}
                   </button>
                   <input
                     ref={logoInputRef}
