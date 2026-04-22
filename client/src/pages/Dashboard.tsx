@@ -1,12 +1,13 @@
 import { trpc } from "@/lib/trpc";
-import { BarChart3, FileText, TrendingDown, Users, AlertTriangle, Upload, ArrowRight, Trash2, Pencil, Check, X } from "lucide-react";
+import { BarChart3, FileText, TrendingDown, Users, AlertTriangle, Upload, ArrowRight, Trash2, Pencil, Check, X, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { usePeriodoActivo } from "@/contexts/PeriodoActivoContext";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
@@ -15,14 +16,25 @@ function formatCurrency(amount: number) {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const { periodoActivoId, setPeriodoActivo } = usePeriodoActivo();
 
   const { data: empleados, isLoading: loadingEmp } = trpc.empleados.list.useQuery();
   const { data: periodos, isLoading: loadingPer } = trpc.periodos.list.useQuery();
 
-  const ultimoPeriodo = periodos?.[0];
+  // Auto-seleccionar el primer período si no hay uno activo
+  useEffect(() => {
+    if (!periodoActivoId && periodos && periodos.length > 0) {
+      setPeriodoActivo(periodos[0].id);
+    }
+  }, [periodos, periodoActivoId, setPeriodoActivo]);
+
+  // Período activo real (puede ser null si aún no hay períodos)
+  const periodoActivo = periodos?.find((p) => p.id === periodoActivoId) ?? periodos?.[0] ?? null;
+  const periodoActivoIdReal = periodoActivo?.id ?? 0;
+
   const { data: reporteData, isLoading: loadingReporte } = trpc.reportes.getReportePeriodo.useQuery(
-    { periodoId: ultimoPeriodo?.id ?? 0 },
-    { enabled: !!ultimoPeriodo?.id }
+    { periodoId: periodoActivoIdReal },
+    { enabled: !!periodoActivoIdReal }
   );
 
   // Estado para renombrar
@@ -69,6 +81,12 @@ export default function Dashboard() {
   const handleCancelRename = (e: React.MouseEvent) => {
     e.stopPropagation();
     setRenamingId(null);
+  };
+
+  const handleSelectPeriodo = (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setPeriodoActivo(id);
+    toast.success(`Período activo actualizado`);
   };
 
   const totalEmpleados = empleados?.length ?? 0;
@@ -119,7 +137,7 @@ export default function Dashboard() {
       icon: BarChart3,
       color: promedioAsistencia >= 80 ? "oklch(0.45 0.15 145)" : "oklch(0.55 0.18 65)",
       bg: promedioAsistencia >= 80 ? "oklch(0.96 0.03 145)" : "oklch(0.97 0.04 65)",
-      change: ultimoPeriodo ? `Período: ${ultimoPeriodo.nombre}` : "Sin período",
+      change: periodoActivo ? `Período: ${periodoActivo.nombre}` : "Sin período",
     },
     {
       label: "Total Descuentos",
@@ -191,9 +209,9 @@ export default function Dashboard() {
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
                 Inasistencias Críticas
               </CardTitle>
-              {ultimoPeriodo && (
+              {periodoActivo && (
                 <Badge variant="outline" className="text-xs">
-                  {ultimoPeriodo.nombre}
+                  {periodoActivo.nombre}
                 </Badge>
               )}
             </div>
@@ -209,7 +227,7 @@ export default function Dashboard() {
               <div className="text-center py-8 text-muted-foreground">
                 <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">
-                  {ultimoPeriodo ? "Sin inasistencias críticas" : "Carga un reporte para ver datos"}
+                  {periodoActivo ? "Sin inasistencias críticas" : "Carga un reporte para ver datos"}
                 </p>
               </div>
             ) : (
@@ -283,93 +301,122 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-2">
-                {periodos?.slice(0, 5).map((periodo) => (
-                  <div
-                    key={periodo.id}
-                    className="flex items-center gap-2 p-3 rounded-lg border border-border/40 hover:border-border transition-colors group"
-                  >
-                    {renamingId === periodo.id ? (
-                      /* Modo edición de nombre */
-                      <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
-                        <Input
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") renameMutation.mutate({ id: periodo.id, nombre: renameValue.trim() });
-                            if (e.key === "Escape") setRenamingId(null);
-                          }}
-                          className="h-7 text-sm flex-1"
-                          autoFocus
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-green-600 hover:text-green-700"
-                          onClick={(e) => handleConfirmRename(e, periodo.id)}
-                          disabled={renameMutation.isPending}
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-muted-foreground"
-                          onClick={handleCancelRename}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      /* Modo normal */
-                      <>
-                        <div
-                          className="min-w-0 flex-1 cursor-pointer"
-                          onClick={() => setLocation(`/reportes/${periodo.id}`)}
-                        >
-                          <p className="text-sm font-medium truncate" style={{ color: "oklch(0.15 0.02 240)" }}>
-                            {periodo.nombre}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {periodo.archivoNombre || "Archivo cargado"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            title="Renombrar"
-                            onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                            title="Eliminar"
-                            onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                          <ArrowRight
-                            className="w-4 h-4 text-muted-foreground cursor-pointer"
-                            onClick={() => setLocation(`/reportes/${periodo.id}`)}
+                {periodos?.slice(0, 5).map((periodo) => {
+                  const isActivo = periodo.id === periodoActivoIdReal;
+                  return (
+                    <div
+                      key={periodo.id}
+                      className={`flex items-center gap-2 p-3 rounded-lg border transition-all group cursor-pointer ${
+                        isActivo
+                          ? "border-2 shadow-sm"
+                          : "border border-border/40 hover:border-border"
+                      }`}
+                      style={isActivo ? {
+                        borderColor: "oklch(0.22 0.06 240)",
+                        background: "oklch(0.95 0.02 240)",
+                      } : {}}
+                      onClick={(e) => handleSelectPeriodo(e, periodo.id)}
+                    >
+                      {renamingId === periodo.id ? (
+                        /* Modo edición de nombre */
+                        <div className="flex items-center gap-2 flex-1" onClick={(e) => e.stopPropagation()}>
+                          <Input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") renameMutation.mutate({ id: periodo.id, nombre: renameValue.trim() });
+                              if (e.key === "Escape") setRenamingId(null);
+                            }}
+                            className="h-7 text-sm flex-1"
+                            autoFocus
                           />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-green-600 hover:text-green-700"
+                            onClick={(e) => handleConfirmRename(e, periodo.id)}
+                            disabled={renameMutation.isPending}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground"
+                            onClick={handleCancelRename}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                      ) : (
+                        /* Modo normal */
+                        <>
+                          {/* Indicador activo */}
+                          <div className="shrink-0">
+                            {isActivo ? (
+                              <CheckCircle2 className="w-4 h-4" style={{ color: "oklch(0.22 0.06 240)" }} />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full border-2 border-border/40 group-hover:border-border transition-colors" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="text-sm font-medium truncate"
+                              style={{ color: isActivo ? "oklch(0.15 0.02 240)" : "oklch(0.25 0.03 240)" }}
+                            >
+                              {periodo.nombre}
+                              {isActivo && (
+                                <span
+                                  className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                                  style={{ background: "oklch(0.22 0.06 240)", color: "white" }}
+                                >
+                                  ACTIVO
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {periodo.archivoNombre || "Archivo cargado"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              title="Renombrar"
+                              onClick={(e) => handleStartRename(e, periodo.id, periodo.nombre)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                              title="Eliminar"
+                              onClick={(e) => handleDelete(e, periodo.id, periodo.nombre)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <ArrowRight
+                              className="w-4 h-4 text-muted-foreground cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); setLocation(`/reportes/${periodo.id}`); }}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Nómina total */}
-      {reporteData && (
+      {/* Nómina total — siempre muestra el período activo */}
+      {reporteData && periodoActivo && (
         <Card
           className="border-0 shadow-md"
           style={{ background: "linear-gradient(135deg, oklch(0.22 0.06 240) 0%, oklch(0.35 0.10 240) 100%)" }}
@@ -378,7 +425,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium" style={{ color: "oklch(0.75 0.03 240)" }}>
-                  Total Nómina a Pagar — {ultimoPeriodo?.nombre}
+                  Total Nómina a Pagar — {periodoActivo.nombre}
                 </p>
                 <p className="text-3xl font-bold text-white mt-1">{formatCurrency(totalNomina)}</p>
                 <p className="text-sm mt-1" style={{ color: "oklch(0.75 0.03 240)" }}>
@@ -387,7 +434,7 @@ export default function Dashboard() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => setLocation(`/reportes/${ultimoPeriodo?.id}`)}
+                onClick={() => setLocation(`/reportes/${periodoActivo.id}`)}
                 className="gap-2 border-white/30 text-white hover:bg-white/10"
                 style={{ background: "transparent" }}
               >

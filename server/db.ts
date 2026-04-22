@@ -76,14 +76,15 @@ export async function getUserByOpenId(openId: string) {
 
 // ─── EMPLEADOS ────────────────────────────────────────────────────────────────
 
-export async function getEmpleados() {
+export async function getEmpleados(periodoId?: number) {
   const db = await getDb();
   if (!db) return [];
-  // Incluir dias_falta del último período procesado
-  const conn = (db as any).session?.client || null;
-  // Usar query raw para el LEFT JOIN con calculos_nomina
+  // Incluir dias_falta del período especificado (o el último si no se especifica)
   const mysql2 = await import("mysql2/promise");
   const rawConn = await mysql2.createConnection(process.env.DATABASE_URL!);
+  const periodoCondicion = periodoId
+    ? `cn.periodo_id = ${periodoId}`
+    : `cn.periodo_id = (SELECT MAX(id) FROM periodos)`;
   const [rows] = await rawConn.execute(`
     SELECT
       e.id,
@@ -99,7 +100,7 @@ export async function getEmpleados() {
         SELECT cn.dias_falta
         FROM calculos_nomina cn
         WHERE cn.empleado_id = e.id
-          AND cn.periodo_id = (SELECT MAX(id) FROM periodos)
+          AND ${periodoCondicion}
         LIMIT 1
       ), 0) as dias_falta_periodo
     FROM empleados e

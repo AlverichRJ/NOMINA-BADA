@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { PeriodoActivoProvider } from "./contexts/PeriodoActivoContext";
 import DashboardLayout from "./components/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import Empleados from "./pages/Empleados";
@@ -33,10 +34,12 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster richColors position="top-right" />
-          <Router />
-        </TooltipProvider>
+        <PeriodoActivoProvider>
+          <TooltipProvider>
+            <Toaster richColors position="top-right" />
+            <Router />
+          </TooltipProvider>
+        </PeriodoActivoProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

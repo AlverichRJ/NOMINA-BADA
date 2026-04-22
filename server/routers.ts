@@ -38,9 +38,11 @@ export const appRouter = router({
 
   // ─── EMPLEADOS ─────────────────────────────────────────────────────────────
   empleados: router({
-    list: publicProcedure.query(async () => {
-      return getEmpleados();
-    }),
+    list: publicProcedure
+      .input(z.object({ periodoId: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        return getEmpleados(input?.periodoId);
+      }),
 
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return getEmpleadoById(input.id);

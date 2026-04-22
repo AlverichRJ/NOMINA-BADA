@@ -70,3 +70,12 @@
 - [x] Logo editable desde el sidebar (subir imagen, se sube a S3 y se guarda URL en BD)
 - [x] Fix bug: error al cambiar logo (base64 demasiado grande para TEXT) — ahora usa S3 storage
 - [x] Los cambios de nombre y logo persisten entre sesiones
+
+## Período Activo Global
+- [x] Contexto global PeriodoActivo (React Context) que persiste en localStorage
+- [x] Dashboard: período activo resaltado con color más fuerte en lista de Períodos Recientes
+- [x] Dashboard: banner Total Nómina muestra datos del período activo
+- [x] Dashboard: clic en período lo selecciona como activo
+- [x] Empleados: faltas y días laborados del período activo (badge indicador del período activo)
+- [x] Reportes: período activo resaltado en la lista (badge ACTIVO + fondo azul + ícono checkmark)
+- [x] Selector de período visible en todas las páginas relevantes (Dashboard, Reportes, Empleados)

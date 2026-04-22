@@ -1,10 +1,18 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
+import { usePeriodoActivo } from "@/contexts/PeriodoActivoContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -114,7 +122,14 @@ function EditableCell({
 
 export default function Empleados() {
   const utils = trpc.useUtils();
-  const { data: empleados, isLoading } = trpc.empleados.list.useQuery();
+  const { periodoActivoId, setPeriodoActivo } = usePeriodoActivo();
+  const { data: periodos } = trpc.periodos.list.useQuery();
+  const periodoActivo = periodos?.find((p) => p.id === periodoActivoId) ?? periodos?.[0] ?? null;
+  const periodoActivoIdReal = periodoActivo?.id;
+
+  const { data: empleados, isLoading } = trpc.empleados.list.useQuery(
+    periodoActivoIdReal ? { periodoId: periodoActivoIdReal } : undefined
+  );
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -204,6 +219,35 @@ export default function Empleados() {
           <p className="text-muted-foreground mt-1">
             Gestiona la nómina y datos de cada empleado. Haz clic en cualquier celda numérica para editarla.
           </p>
+          {(periodos?.length ?? 0) > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">Período activo:</span>
+              <Select
+                value={String(periodoActivoIdReal ?? "")}
+                onValueChange={(val) => {
+                  const id = parseInt(val, 10);
+                  setPeriodoActivo(id);
+                  const nombre = periodos?.find((p) => p.id === id)?.nombre ?? "";
+                  toast.success(`Período activo: ${nombre}`);
+                }}
+              >
+                <SelectTrigger
+                  className="h-7 text-xs w-auto min-w-[180px] max-w-xs"
+                  style={{ borderColor: "oklch(0.22 0.06 240)", color: "oklch(0.15 0.02 240)" }}
+                >
+                  <SelectValue placeholder="Seleccionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodos?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)} className="text-xs">
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">Las faltas corresponden a este período</span>
+            </div>
+          )}
         </div>
         <Button
           onClick={openCreate}
