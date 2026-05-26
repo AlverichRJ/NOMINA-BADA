@@ -5,7 +5,13 @@
 
 export interface RegistroDia {
   fecha: string; // YYYY-MM-DD
+  /** Primera marca del día: inicio de jornada laboral. */
   entrada: string | null;
+  /** Segunda marca del día cuando existe comida: salida a comer. */
+  salidaComida: string | null;
+  /** Tercera marca del día cuando existe comida: regreso de comida. */
+  entradaComida: string | null;
+  /** Última marca del día: salida final de jornada laboral. */
   salida: string | null;
   esFalta: boolean;
   esDescanso: boolean;
@@ -59,22 +65,41 @@ function convertirHora12(horaStr: string): string {
 }
 
 function extraerHoras(linea: string): string[] {
-  // El formato del TXT pega el año (2 dígitos) directamente con la hora: "268:50am"
-  // Para separar correctamente: primero eliminar el patrón de fecha (dd/mes/AA) de la línea
-  // y luego extraer horas del resto
-  // Reemplazar el patrón de fecha para que el año no interfiera con la hora
+  // El formato del TXT pega el año (2 dígitos) directamente con la hora: "268:50am".
+  // Para separar correctamente: primero eliminar el año de la fecha (dd/mes/AA) de la línea.
   const lineaSinFecha = linea.replace(/\d{1,2}\/[a-záéíóú]+\/(\d{2})/gi, (match, anio) => {
-    // Reemplazar el año con un marcador que no sea dígito
-    return match.slice(0, -anio.length) + 'XX';
+    return match.slice(0, -anio.length) + "XX";
   });
-  // Ahora extraer horas: el año fue reemplazado por 'XX' por lo que '8:50am' ya no tiene dígitos antes
-  const regex = /(?<!\d)(\d{1,2}):(\d{2})(am|pm)/gi;
+
+  // Regla robusta para el TXT real del reloj checador:
+  // solo son marcas válidas las horas con AM/PM. Los valores sin AM/PM, como 5:14 o 4:17,
+  // pertenecen a la columna Tiempo y se descartan desde aquí para no contaminar comida.
+  const regex = /(\d{1,2}):(\d{2})(am|pm)/gi;
   const resultados: string[] = [];
   let matchResult: RegExpExecArray | null;
   while ((matchResult = regex.exec(lineaSinFecha)) !== null) {
-    resultados.push(convertirHora12(`${matchResult[1]}:${matchResult[2]}${matchResult[3]}`));
+    const valor = `${matchResult[1]}:${matchResult[2]}${matchResult[3]}`;
+    resultados.push(convertirHora12(valor));
   }
   return resultados;
+}
+
+function asignarMarcasDia(dia: RegistroDia, valores: string[]) {
+  dia.entrada = valores[0] || null;
+
+  if (valores.length >= 4) {
+    dia.salidaComida = valores[1] || null;
+    dia.entradaComida = valores[2] || null;
+    dia.salida = valores[3] || null;
+  } else if (valores.length === 3) {
+    dia.salidaComida = valores[1] || null;
+    dia.entradaComida = null;
+    dia.salida = valores[2] || null;
+  } else {
+    dia.salidaComida = null;
+    dia.entradaComida = null;
+    dia.salida = valores[1] || null;
+  }
 }
 
 /**
@@ -93,13 +118,15 @@ export function parsearArchivo(contenido: string): ParseResult {
   const reEmpleado = /^\s*\(\d+\)\s+(.+?)\s*$/;
 
   // Regex para detectar línea de fecha corta: "lun. 1/abr/26..." o "mié. 1/abr/268:54am..."
-  // IMPORTANTE: el año es exactamente 2 dígitos (26 = 2026), seguido de hora (1-2 dígitos + colon) o espacio o fin
+  // IMPORTANTE: no dependemos del nombre exacto del día, porque en archivos Latin-1 mal decodificados
+  // los acentos pueden llegar como "s�b.", "mi�rcoles" o variantes mojibake. La fecha es la fuente confiable.
   // El lookahead (?=\d{1,2}:) captura cuando la hora va pegada al año (ej: 268:50am -> año=26, hora=8:50am)
-  const reFechaCorta = /^\s*(?:lun|mar|mi[eé]|jue|vie|s[aá]b|dom)\.\s+(\d{1,2})\/([a-záéíóú]+)\/(\d{2})(?=\d{1,2}:|\s|$)/i;
+  const reFechaCorta = /^\s*[^\d\/\r\n]+?\s+(\d{1,2})\/([a-záéíóúñ]+)\/(\d{2})(?=\d{1,2}:|\s|$)/i;
 
   // Regex para detectar línea de estado: "lunes 1/abr/26Asistido..." o "miércoles 15/abr/26Falta..."
-  // Nota: el estado puede aparecer pegado a la fecha o separado por espacio
-  const reEstado = /^\s*(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[áa]bado|domingo)\s+(\d{1,2})\/([a-záéíóú]+)\/(\d{2,4})\s*(Asistido|Falta|Descanso)/i;
+  // Nota: el estado puede aparecer pegado a la fecha o separado por espacio. También aquí ignoramos
+  // el nombre exacto del día para no perder sábados/miércoles cuando el acento llegue corrupto.
+  const reEstado = /^\s*[^\d\/\r\n]+?\s+(\d{1,2})\/([a-záéíóúñ]+)\/(\d{2,4})\s*(Asistido|Falta|Descanso)/i;
 
   // Regex para detectar línea de ingreso
   const reIngreso = /Fecha de ingreso:\s*(\S+)/i;
@@ -117,10 +144,10 @@ export function parsearArchivo(contenido: string): ParseResult {
 
   const guardarDiaActual = () => {
     if (diaActual && empleadoActual) {
-      // Asignar primera entrada y última salida de las horas acumuladas
+      // Interpretar solo las marcas reales del reloj checador en orden cronológico.
+      // Las duraciones de la columna Tiempo no tienen AM/PM y se descartan al extraer horas.
       if (horasAcumuladas.length > 0 && !diaActual.esFalta && !diaActual.esDescanso) {
-        diaActual.entrada = horasAcumuladas[0] || null;
-        diaActual.salida = horasAcumuladas.length > 1 ? horasAcumuladas[horasAcumuladas.length - 1] : null;
+        asignarMarcasDia(diaActual, horasAcumuladas);
       }
       empleadoActual.registros.push(diaActual);
       diaActual = null;
@@ -197,6 +224,8 @@ export function parsearArchivo(contenido: string): ParseResult {
         diaActual = {
           fecha,
           entrada: null,
+          salidaComida: null,
+          entradaComida: null,
           salida: null,
           esFalta,
           esDescanso,
@@ -229,6 +258,8 @@ export function parsearArchivo(contenido: string): ParseResult {
         diaActual = {
           fecha,
           entrada: null,
+          salidaComida: null,
+          entradaComida: null,
           salida: null,
           esFalta: false,
           esDescanso: false,
@@ -243,7 +274,9 @@ export function parsearArchivo(contenido: string): ParseResult {
 
       // Extraer horas de esta línea
       const horas = extraerHoras(linea);
-      horasAcumuladas.push(...horas);
+      for (const hora of horas) {
+        horasAcumuladas.push(hora);
+      }
 
       // Actualizar fechas del período
       if (!fechaInicio || fecha < fechaInicio) fechaInicio = fecha;
@@ -255,7 +288,9 @@ export function parsearArchivo(contenido: string): ParseResult {
     // Detectar líneas de solo horas (registros adicionales del mismo día)
     if (reSoloHoras.test(linea) && diaActual) {
       const horas = extraerHoras(linea);
-      horasAcumuladas.push(...horas);
+      for (const hora of horas) {
+        horasAcumuladas.push(hora);
+      }
       continue;
     }
 

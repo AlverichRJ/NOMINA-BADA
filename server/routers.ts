@@ -1,14 +1,17 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, reportesProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import {
   getEmpleados,
+  getEmpleadosEliminados,
   getEmpleadoById,
   crearEmpleado,
   actualizarEmpleado,
   eliminarEmpleado,
+  restaurarEmpleado,
+  limpiarHistorialEliminados,
   getPeriodos,
   getPeriodoById,
   crearPeriodo,
@@ -24,8 +27,33 @@ import {
   getEmpleadoByNombre,
   getAllUsers,
   updateUserRole,
+  getDepartamentos,
+  crearDepartamento,
+  actualizarDepartamento,
+  eliminarDepartamento,
+  getDiasPeriodo,
+  updateDiasSeleccionadosPeriodo,
+  getPeriodoDiasSeleccionados,
+  getSabadosPeriodo,
+  actualizarEstadoSabadosPeriodo,
+  sumarDiasFestivosEmpleados,
 } from "./db";
 import { parsearArchivo, calcularDescuento, calcularSalarioAPagar, esDomingo } from "./parser";
+
+function esNombreNoIdentificado(nombre?: string | null) {
+  const normalizado = String(nombre ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return !normalizado || ["desconocido", "unknown", "sin nombre", "sin identificar"].includes(normalizado);
+}
+
+function nombreEmpleadoParaReporte(emp: any, empleadoId: number) {
+  if (!emp) return `Empleado eliminado #${empleadoId}`;
+  if (esNombreNoIdentificado(emp.nombre)) return `Empleado sin identificar #${empleadoId}`;
+  return emp.nombre;
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -38,6 +66,34 @@ export const appRouter = router({
     }),
   }),
 
+  // ─── DEPARTAMENTOS ────────────────────────────────────────────────────────
+  departamentos: router({
+    list: publicProcedure.query(async () => {
+      return getDepartamentos();
+    }),
+
+    create: adminProcedure
+      .input(z.object({ nombre: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await crearDepartamento({ nombre: input.nombre.trim(), activo: true });
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({ id: z.number(), nombre: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await actualizarDepartamento(input.id, input.nombre.trim());
+        return { success: true };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await eliminarDepartamento(input.id);
+        return { success: true };
+      }),
+  }),
+
   // ─── EMPLEADOS ─────────────────────────────────────────────────────────────
   empleados: router({
     list: publicProcedure
@@ -45,6 +101,10 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getEmpleados(input?.periodoId);
       }),
+
+    listEliminados: publicProcedure.query(async () => {
+      return getEmpleadosEliminados();
+    }),
 
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return getEmpleadoById(input.id);
@@ -56,6 +116,12 @@ export const appRouter = router({
           nombre: z.string().min(1),
           salarioMensual: z.number().min(0),
           bonos: z.number().min(0).default(0),
+          departamentoId: z.number().nullable().optional(),
+          notas: z.string().max(10000).nullable().optional(),
+          banco: z.string().max(120).nullable().optional(),
+          numeroCuenta: z.string().max(80).nullable().optional(),
+          tarjeta: z.string().max(80).nullable().optional(),
+          clabeInterbancaria: z.string().max(80).nullable().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -63,11 +129,17 @@ export const appRouter = router({
           nombre: input.nombre,
           salarioMensual: input.salarioMensual.toFixed(2),
           bonos: input.bonos.toFixed(2),
+          departamentoId: input.departamentoId ?? null,
+          notas: input.notas?.trim() || null,
+          banco: input.banco?.trim().toUpperCase() || null,
+          numeroCuenta: input.numeroCuenta?.trim() || null,
+          tarjeta: input.tarjeta?.trim() || null,
+          clabeInterbancaria: input.clabeInterbancaria?.trim() || null,
         });
         return { success: true };
       }),
 
-    update: adminProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -76,17 +148,39 @@ export const appRouter = router({
           bonos: z.number().min(0).optional(),
           diasLaborados: z.number().min(0).optional(),
           descuentosAdicionales: z.number().min(0).optional(),
+          nominaLista: z.boolean().optional(),
+          periodoId: z.number().optional(),
+          departamentoId: z.number().nullable().optional(),
+          notas: z.string().max(10000).nullable().optional(),
+          banco: z.string().max(120).nullable().optional(),
+          numeroCuenta: z.string().max(80).nullable().optional(),
+          tarjeta: z.string().max(80).nullable().optional(),
+          clabeInterbancaria: z.string().max(80).nullable().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        const { id, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+        const { id, periodoId, ...data } = input;
+        const camposNoAdmin = Object.entries(data).filter(([campo, valor]) => campo !== "nominaLista" && valor !== undefined);
+        if (ctx.user.role === "reportes" || (ctx.user.role !== "admin" && camposNoAdmin.length > 0)) {
+          throw new Error("No tienes permisos para esta acción");
+        }
         const updateData: Record<string, unknown> = {};
         if (data.nombre !== undefined) updateData.nombre = data.nombre;
         if (data.salarioMensual !== undefined) updateData.salarioMensual = data.salarioMensual.toFixed(2);
         if (data.bonos !== undefined) updateData.bonos = data.bonos.toFixed(2);
-        if (data.diasLaborados !== undefined) updateData.diasLaborados = data.diasLaborados;
+        if (data.diasLaborados !== undefined) {
+          updateData.diasLaborados = data.diasLaborados;
+          updateData.diasLaboradosManual = true;
+        }
         if (data.descuentosAdicionales !== undefined) updateData.descuentosAdicionales = data.descuentosAdicionales.toFixed(2);
-        await actualizarEmpleado(id, updateData as any);
+        if (data.nominaLista !== undefined) updateData.nominaLista = data.nominaLista;
+        if (data.departamentoId !== undefined) updateData.departamentoId = data.departamentoId;
+        if (data.notas !== undefined) updateData.notas = data.notas?.trim() || null;
+        if (data.banco !== undefined) updateData.banco = data.banco?.trim().toUpperCase() || null;
+        if (data.numeroCuenta !== undefined) updateData.numeroCuenta = data.numeroCuenta?.trim() || null;
+        if (data.tarjeta !== undefined) updateData.tarjeta = data.tarjeta?.trim() || null;
+        if (data.clabeInterbancaria !== undefined) updateData.clabeInterbancaria = data.clabeInterbancaria?.trim() || null;
+        await actualizarEmpleado(id, updateData as any, periodoId);
         return { success: true };
       }),
 
@@ -95,6 +189,29 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await eliminarEmpleado(input.id);
         return { success: true };
+      }),
+
+    restore: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await restaurarEmpleado(input.id);
+        return { success: true };
+      }),
+
+    clearHistorial: adminProcedure.mutation(async () => {
+      await limpiarHistorialEliminados();
+      return { success: true };
+    }),
+
+    sumarDiasFestivos: adminProcedure
+      .input(z.object({
+        periodoId: z.number(),
+        dias: z.number().int().min(1).max(31),
+        empleadoIds: z.array(z.number()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await sumarDiasFestivosEmpleados(input);
+        return { success: true, ...result };
       }),
   }),
 
@@ -124,11 +241,44 @@ export const appRouter = router({
         await renamePeriodo(input.id, input.nombre);
         return { success: true };
       }),
+
+    getDias: publicProcedure
+      .input(z.object({ periodoId: z.number() }))
+      .query(async ({ input }) => {
+        const dias = await getDiasPeriodo(input.periodoId);
+        const seleccionados = await getPeriodoDiasSeleccionados(input.periodoId);
+        return { dias, seleccionados: seleccionados ?? dias };
+      }),
+
+    updateDiasSeleccionados: adminProcedure
+      .input(z.object({ periodoId: z.number(), dias: z.array(z.string()) }))
+      .mutation(async ({ input }) => {
+        await updateDiasSeleccionadosPeriodo(input.periodoId, input.dias);
+        return { success: true };
+      }),
+
+    getSabados: publicProcedure
+      .input(z.object({ periodoId: z.number() }))
+      .query(async ({ input }) => {
+        return getSabadosPeriodo(input.periodoId);
+      }),
+
+    actualizarSabados: adminProcedure
+      .input(z.object({
+        periodoId: z.number(),
+        fechas: z.array(z.string()).min(1),
+        estado: z.enum(["asistencia", "falta", "descanso"]),
+        empleadoIds: z.array(z.number()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await actualizarEstadoSabadosPeriodo(input);
+        return { success: true, ...result };
+      }),
   }),
 
   // ─── REPORTES ──────────────────────────────────────────────────────────────
   reportes: router({
-    procesarArchivo: adminProcedure
+    procesarArchivo: reportesProcedure
       .input(
         z.object({
           contenido: z.string(),
@@ -171,7 +321,6 @@ export const appRouter = router({
 
         // Obtener todos los empleados de la DB
         const empleadosDB = await getEmpleados();
-        const empleadosMap = new Map(empleadosDB.map((e) => [e.nombre.toLowerCase().trim(), e]));
 
         // Helper: normalizar nombre (sin acentos, minúsculas)
         function normalizarNombre(s: string) {
@@ -179,6 +328,8 @@ export const appRouter = router({
             .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
             .replace(/\s+/g, " ");
         }
+
+        const empleadosMap = new Map(empleadosDB.map((e) => [normalizarNombre(e.nombre), e]));
 
         // Helper: similitud por palabras en común (>= 3 chars)
         function similitudNombre(a: string, b: string): number {
@@ -190,10 +341,11 @@ export const appRouter = router({
         }
 
         const resultados = [];
+        const empleadosNoRegistrados: string[] = [];
 
         for (const empParsed of empleadosParsed) {
           // 1. Buscar por nombre exacto
-          let empleadoDB = empleadosMap.get(empParsed.nombre.toLowerCase().trim());
+          let empleadoDB = empleadosMap.get(normalizarNombre(empParsed.nombre));
 
           // 2. Si no existe, buscar por similitud de palabras (match inteligente)
           if (!empleadoDB) {
@@ -208,16 +360,14 @@ export const appRouter = router({
             }
           }
 
-          // 3. Solo crear nuevo empleado si realmente no hay match
+          // 3. El TXT no puede crear empleados ni información adicional.
+          // Si el nombre aparece en el TXT pero no existe en el sistema, se omite
+          // y se devuelve como advertencia para registrarlo manualmente desde Empleados.
           if (!empleadoDB) {
-            await crearEmpleado({
-              nombre: empParsed.nombre,
-              salarioMensual: "0",
-              bonos: "0",
-            });
-            const empCreado = await getEmpleadoByNombre(empParsed.nombre);
-            if (!empCreado) continue;
-            empleadoDB = empCreado;
+            if (!empleadosNoRegistrados.includes(empParsed.nombre)) {
+              empleadosNoRegistrados.push(empParsed.nombre);
+            }
+            continue;
           }
 
           if (!empleadoDB) continue;
@@ -231,6 +381,8 @@ export const appRouter = router({
             periodoId,
             fecha: r.fecha,
             entrada: r.entrada,
+            salidaComida: r.salidaComida,
+            entradaComida: r.entradaComida,
             salida: r.salida,
             esFalta: r.esFalta,
             esDescanso: r.esDescanso,
@@ -258,8 +410,11 @@ export const appRouter = router({
             salarioAPagar: Math.max(0, salarioAPagar).toFixed(2),
           });
 
-          // Sincronizar días laborados (asistidos) al registro del empleado
-          await actualizarEmpleado(empleadoId, { diasLaborados: Math.max(0, diasAsistidos) } as any);
+          // Sincronizar días laborados automáticos solo si el empleado no tiene ajuste manual protegido.
+          const empleadoActual = await getEmpleadoById(empleadoId);
+          if (!empleadoActual?.diasLaboradosManual) {
+            await actualizarEmpleado(empleadoId, { diasLaborados: Math.max(0, diasAsistidos) } as any);
+          }
 
           resultados.push({
             nombre: empParsed.nombre,
@@ -276,28 +431,27 @@ export const appRouter = router({
           periodoId,
           nombrePeriodo: periodoFinal?.nombre ?? `${fechaInicio} al ${fechaFin}`,
           totalEmpleados: resultados.length,
+          empleadosNoRegistrados,
           resultados,
         };
       }),
 
     getReportePeriodo: publicProcedure
       .input(z.object({ periodoId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const periodo = await getPeriodoById(input.periodoId);
         if (!periodo) throw new Error("Período no encontrado");
 
-        const asistenciasDB = await getAsistenciasByPeriodo(input.periodoId);
-        const calculosDB = await getCalculosByPeriodo(input.periodoId);
-        const empleadosDB = await getEmpleados();
-        const todosEmpleados = await (async () => {
-          const { getDb } = await import("./db");
-          const db = await getDb();
-          if (!db) return [];
-          const { empleados: emp } = await import("../drizzle/schema");
-          return db.select().from(emp);
-        })();
+        const asistenciasTodas = await getAsistenciasByPeriodo(input.periodoId);
+        const diasPeriodo = await getDiasPeriodo(input.periodoId);
+        const diasSeleccionados = await getPeriodoDiasSeleccionados(input.periodoId);
+        const diasActivos = diasSeleccionados && diasSeleccionados.length > 0 ? diasSeleccionados : diasPeriodo;
+        const diasActivosSet = new Set(diasActivos);
+        const asistenciasDB = asistenciasTodas.filter((a) => diasActivosSet.has(a.fecha));
+        const empleadosDB = await getEmpleados(input.periodoId, true);
 
-        const empleadosMap = new Map(todosEmpleados.map((e) => [e.id, e]));
+        const empleadosMap = new Map(empleadosDB.map((e: any) => [e.id, e]));
+        const ocultarMontos = ctx.user?.role === "reportes";
 
         // Agrupar asistencias por empleado
         const asistenciasPorEmpleado = new Map<number, typeof asistenciasDB>();
@@ -308,22 +462,46 @@ export const appRouter = router({
           asistenciasPorEmpleado.get(a.empleadoId)!.push(a);
         }
 
-        const calculos = calculosDB.map((c) => {
-          const emp = empleadosMap.get(c.empleadoId);
+        const calculos = Array.from(asistenciasPorEmpleado.entries()).map(([empleadoId, asistenciasEmpleado]) => {
+          const emp = empleadosMap.get(empleadoId) as any;
+          const asistenciasOrdenadas = asistenciasEmpleado.sort((a, b) => a.fecha.localeCompare(b.fecha));
+          const salario = parseFloat(String(emp?.salarioMensual ?? "0")) || 0;
+          const bonos = parseFloat(String(emp?.bonos ?? "0")) || 0;
+          const diasLaborables = asistenciasOrdenadas.filter((r) => !r.esDescanso && !esDomingo(r.fecha)).length;
+          const diasFalta = asistenciasOrdenadas.filter((r) => r.esFalta).length;
+          const diasAsistidos = Math.max(0, diasLaborables - diasFalta);
+          const descuento = calcularDescuento(salario, diasFalta);
+          const salarioAPagar = calcularSalarioAPagar(salario, diasLaborables, bonos, descuento);
+
           return {
-            ...c,
-            empleadoNombre: emp?.nombre || "Desconocido",
-            salarioMensual: parseFloat(emp?.salarioMensual as string || "0"),
-            bonos: parseFloat(emp?.bonos as string || "0"),
-            asistencias: (asistenciasPorEmpleado.get(c.empleadoId) || []).sort(
-              (a, b) => a.fecha.localeCompare(b.fecha)
-            ),
+            empleadoId,
+            periodoId: input.periodoId,
+            diasLaborables,
+            diasAsistidos,
+            diasFalta,
+            descuento: ocultarMontos ? null : descuento.toFixed(2),
+            salarioAPagar: ocultarMontos ? null : Math.max(0, salarioAPagar).toFixed(2),
+            empleadoNombre: nombreEmpleadoParaReporte(emp, empleadoId),
+            nombreOriginal: emp?.nombre ?? null,
+            requiereRevisionNombre: !emp || esNombreNoIdentificado(emp?.nombre),
+            departamentoId: emp?.departamentoId ?? null,
+            departamentoNombre: emp?.departamentoNombre ?? null,
+            notas: emp?.notas ?? null,
+            salarioMensual: ocultarMontos ? null : salario,
+            bonos: ocultarMontos ? null : bonos,
+            asistencias: asistenciasOrdenadas,
           };
         });
+
+        const empleadosCriticos = calculos
+          .filter((c) => c.diasFalta >= 3)
+          .sort((a, b) => b.diasFalta - a.diasFalta);
 
         return {
           periodo,
           calculos,
+          diasPeriodo,
+          diasSeleccionados: diasActivos,
           totalEmpleados: calculos.length,
           promedioAsistencia:
             calculos.length > 0
@@ -334,9 +512,7 @@ export const appRouter = router({
                   0
                 ) / calculos.length
               : 0,
-          empleadosCriticos: calculos
-            .filter((c) => c.diasFalta >= 3)
-            .sort((a, b) => b.diasFalta - a.diasFalta),
+          empleadosCriticos,
         };
       }),
 
@@ -475,7 +651,7 @@ export const appRouter = router({
     updateRole: adminProcedure
       .input(z.object({
         id: z.number(),
-        role: z.enum(["user", "admin"]),
+        role: z.enum(["user", "admin", "reportes"]),
       }))
       .mutation(async ({ input, ctx }) => {
         // No permitir que el admin se quite su propio rol

@@ -1,31 +1,16 @@
 import { trpc } from "@/lib/trpc";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, FileText, Loader2, Upload, X, Lock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Upload, X, Lock } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function CargarReporte() {
   const [, setLocation] = useLocation();
   const { user, loading } = useAuth();
-  const isAdmin = user?.role === "admin";
-
-  useEffect(() => {
-    if (!loading && user && !isAdmin) {
-      setLocation("/");
-    }
-  }, [user, loading, isAdmin, setLocation]);
-
-  if (!loading && user && !isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Lock className="w-12 h-12 text-muted-foreground opacity-40" />
-        <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
-      </div>
-    );
-  }
+  const canLoadReports = user?.role === "admin" || user?.role === "reportes";
 
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -33,40 +18,62 @@ export default function CargarReporte() {
     periodoId: number;
     nombrePeriodo: string;
     totalEmpleados: number;
+    empleadosNoRegistrados?: string[];
   } | null>(null);
+
+  useEffect(() => {
+    if (!loading && user && !canLoadReports) {
+      setLocation("/");
+    }
+  }, [user, loading, canLoadReports, setLocation]);
 
   const procesarMutation = trpc.reportes.procesarArchivo.useMutation({
     onSuccess: (data) => {
       setResult(data);
-      toast.success(`Reporte procesado: ${data.totalEmpleados} empleados`);
+      const omitidos = data.empleadosNoRegistrados?.length ?? 0;
+      toast.success(`Reporte procesado: ${data.totalEmpleados} empleados${omitidos ? `, ${omitidos} no registrados` : ""}`);
     },
     onError: (e) => toast.error(`Error: ${e.message}`),
   });
 
-  const handleFile = (f: File) => {
-    if (!f.name.endsWith(".txt")) {
+  const handleFile = useCallback((f: File) => {
+    if (!f.name.toLowerCase().endsWith(".txt")) {
       toast.error("Solo se aceptan archivos .txt");
       return;
     }
     setFile(f);
     setResult(null);
-  };
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files[0];
     if (f) handleFile(f);
-  }, []);
+  }, [handleFile]);
+
+  const leerTxtLatin1 = async (archivo: File): Promise<string> => {
+    const buffer = await archivo.arrayBuffer();
+    return new TextDecoder("iso-8859-1").decode(buffer);
+  };
 
   const handleProcess = async () => {
     if (!file) return;
-    const text = await file.text();
+    const text = await leerTxtLatin1(file);
     procesarMutation.mutate({ contenido: text, nombreArchivo: file.name });
   };
 
+  if (!loading && user && !canLoadReports) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4" translate="no">
+        <Lock className="w-12 h-12 text-muted-foreground opacity-40" />
+        <p className="text-muted-foreground">No tienes permisos para acceder a esta sección.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6 max-w-2xl mx-auto" translate="no">
       <div>
         <h1 className="text-3xl font-bold" style={{ color: "oklch(0.15 0.02 240)" }}>
           Cargar Reporte
@@ -185,6 +192,22 @@ export default function CargarReporte() {
                 <p className="text-sm" style={{ color: "oklch(0.38 0.12 145)" }}>
                   <strong>Empleados procesados:</strong> {result.totalEmpleados}
                 </p>
+                {(result.empleadosNoRegistrados?.length ?? 0) > 0 && (
+                  <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">Hay personas que se encontraron en el archivo TXT pero no en el sistema.</p>
+                        <p className="mt-1 text-sm">No se agregaron automáticamente. Para incluirlas, primero agrégalas desde el módulo de Empleados y después vuelve a cargar el TXT si corresponde.</p>
+                        <ul className="mt-2 max-h-40 list-disc overflow-y-auto pl-5 text-sm">
+                          {result.empleadosNoRegistrados?.map((nombre) => (
+                            <li key={nombre}>{nombre}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-3 mt-4">
                   <Button
                     onClick={() => setLocation(`/reportes/${result.periodoId}`)}
@@ -217,14 +240,14 @@ export default function CargarReporte() {
           <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
             <li>Exporta el reporte de asistencias del reloj checador en formato TXT</li>
             <li>Sube el archivo usando el área de carga o arrastrándolo</li>
-            <li>El sistema detectará automáticamente las faltas y calculará descuentos</li>
-            <li>Revisa el reporte generado y exporta a PDF o Excel si lo necesitas</li>
+            <li>El sistema detectará asistencias, faltas y horarios del TXT</li>
+            <li>El TXT no agrega empleados ni información extra; las altas y datos bancarios se gestionan solo desde Empleados</li>
           </ol>
           <div
             className="mt-4 p-3 rounded-lg text-xs"
             style={{ background: "oklch(0.97 0.02 240)", color: "oklch(0.45 0.04 240)" }}
           >
-            <strong>Nota:</strong> Cualquier línea del archivo que contenga la palabra "Falta" se registrará como falta obligatoria. Los domingos no se cuentan como días laborables.
+            <strong>Nota:</strong> Cualquier línea del archivo que contenga la palabra "Falta" se registrará como falta obligatoria. Si el TXT incluye personas no registradas, se mostrará una advertencia roja y esas personas no se crearán automáticamente.
           </div>
         </CardContent>
       </Card>

@@ -43,3 +43,20 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+export const reportesProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user || (ctx.user.role !== 'admin' && ctx.user.role !== 'reportes')) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permisos para esta acción" });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  }),
+);
