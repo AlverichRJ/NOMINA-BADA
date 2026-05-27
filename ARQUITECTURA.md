@@ -41,7 +41,22 @@
 
 ---
 
-## Stack tecnológico (Sistema de Nómina)
+## Repositorios
+
+> **REGLA:** Cada sistema tiene su propio repositorio GitHub independiente.
+> Nunca mezcles código de un sistema en el repo de otro.
+
+| Sistema | Repositorio GitHub | Estado |
+|---|---|---|
+| Nómina | `AlverichRJ/NOMINA-BADA` | ✅ Activo |
+| Tickets | `AlverichRJ/TICKETS-BADA` | 🔜 Por crear |
+| Social Media | `AlverichRJ/SOCIAL-BADA` | 🔜 Por crear |
+
+Cuando inicies un sistema nuevo: **abre un chat nuevo en Manus**, pega este archivo `ARQUITECTURA.md` y especifica el repo del nuevo sistema.
+
+---
+
+## Stack tecnológico (todos los sistemas)
 
 | Capa | Tecnología |
 |---|---|
@@ -49,10 +64,9 @@
 | UI | Tailwind CSS + shadcn/ui |
 | Backend | Node.js + Express |
 | API | tRPC |
-| Base de datos | MySQL (schema: `badabun_nomina`) |
+| Base de datos | MySQL (schema separado por sistema) |
 | Auth | Google OAuth 2.0 (Passport.js) |
 | Deploy | PM2 + Nginx |
-| Repo | `AlverichRJ/NOMINA-BADA` |
 
 ---
 
@@ -67,25 +81,34 @@
 
 ---
 
-## Estructura del proyecto
+## Estructura del servidor
+
+Cada sistema vive en su propio directorio dentro de `/var/www/`. **Nunca se mezclan archivos entre sistemas.**
 
 ```
-/var/www/asistencias/
-├── client/              ← Frontend React
-│   └── src/
-│       ├── pages/       ← Páginas principales
-│       ├── components/  ← Componentes reutilizables
-│       └── _core/       ← NO TOCAR (auth hooks, etc.)
-├── server/              ← Backend Node.js
-│   ├── routers.ts       ← Procedimientos tRPC
-│   ├── db.ts            ← Helpers de base de datos
-│   └── _core/           ← NO TOCAR (oauth, trpc, context)
-│       ├── trpc.ts      ← Definición de procedures (adminProcedure, reportesProcedure, etc.)
-│       ├── cookies.ts   ← Configuración de cookies de sesión
-│       └── oauth.ts     ← Google OAuth (NO TOCAR)
-├── drizzle/             ← Schema y migraciones de BD
-├── dist/                ← Compilado (generado por pnpm build en el servidor)
-└── ecosystem.config.cjs ← Configuración de PM2 y variables de entorno
+/var/www/
+├── asistencias/          ← Sistema de Nómina (ACTIVO)
+│   ├── client/           ← Frontend React
+│   │   └── src/
+│   │       ├── pages/    ← Páginas principales
+│   │       ├── components/ ← Componentes reutilizables
+│   │       └── _core/    ← NO TOCAR (auth hooks, etc.)
+│   ├── server/           ← Backend Node.js
+│   │   ├── routers.ts    ← Procedimientos tRPC
+│   │   ├── db.ts         ← Helpers de base de datos
+│   │   └── _core/        ← NO TOCAR (oauth, trpc, context)
+│   │       ├── trpc.ts   ← Procedures (adminProcedure, reportesProcedure, etc.)
+│   │       ├── cookies.ts ← Configuración de cookies de sesión
+│   │       └── oauth.ts  ← Google OAuth (NO TOCAR)
+│   ├── drizzle/          ← Schema y migraciones de BD
+│   ├── dist/             ← Compilado (pnpm build en el servidor)
+│   └── ecosystem.config.cjs ← PM2 + variables de entorno
+│
+├── tickets/              ← Sistema de Tickets (POR CREAR)
+│   └── ...               ← Misma estructura que asistencias/
+│
+└── social/               ← Sistema de Social Media (POR CREAR)
+    └── ...               ← Misma estructura que asistencias/
 ```
 
 ---
