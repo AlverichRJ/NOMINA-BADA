@@ -482,7 +482,7 @@ export default function ReporteDetalle() {
             color: "oklch(0.45 0.15 145)",
             bg: "oklch(0.96 0.03 145)",
           },
-          ...(!isReportesOnly ? [
+          ...(isAdmin ? [
             {
               label: "Total Descuentos",
               value: formatCurrency(totalDescuentos),
@@ -665,7 +665,7 @@ export default function ReporteDetalle() {
                         {emp.diasFalta} {emp.diasFalta === 1 ? "falta" : "faltas"}
                       </Badge>
                     )}
-                    {!isReportesOnly && (
+                    {isAdmin && (
                       <div className="text-right hidden sm:block">
                         <p className="text-sm font-bold" style={{ color: "oklch(0.15 0.02 240)" }}>
                           {formatCurrency(salarioAPagar)}
@@ -690,7 +690,7 @@ export default function ReporteDetalle() {
               {isExpanded && (
                 <div className="border-t border-border/40">
                   {/* Summary */}
-                  {!isReportesOnly && (
+                  {isAdmin && (
                     <div
                       className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3"
                       style={{ background: "oklch(0.975 0.004 240)" }}
