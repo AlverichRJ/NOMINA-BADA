@@ -594,7 +594,7 @@ export default function ReporteDetalle() {
                         {d.nombre}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {d.empleados} {d.empleados === 1 ? "empleado" : "empleados"} · {d.promedioAsistencia}% asistencia
+                        {d.empleados} {d.empleados === 1 ? "empleado" : "empleados"}
                       </p>
                     </div>
                     <div
@@ -604,11 +604,6 @@ export default function ReporteDetalle() {
                       <Users className="h-4 w-4" style={{ color: activo ? "white" : "oklch(0.22 0.06 240)" }} />
                     </div>
                   </div>
-                  {!isReportesOnly && (
-                    <p className="mt-3 text-sm font-bold" style={{ color: "oklch(0.22 0.06 240)" }}>
-                      {formatCurrency(d.totalNomina)}
-                    </p>
-                  )}
                 </button>
               );
             })}
