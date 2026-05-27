@@ -10,7 +10,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 export default function CargarReporte() {
   const [, setLocation] = useLocation();
   const { user, loading } = useAuth();
-  const canLoadReports = user?.role === "admin" || user?.role === "reportes";
+  const canLoadReports = user?.role === "admin" || user?.role === "reportes" || user?.role === "user";
 
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);

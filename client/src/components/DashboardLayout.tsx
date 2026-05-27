@@ -45,7 +45,7 @@ import { toast } from "sonner";
 
 const allMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", adminOnly: false },
-  { icon: Users, label: "Empleados", path: "/empleados", adminOnly: false },
+  { icon: Users, label: "Empleados", path: "/empleados", adminOnly: true },
   { icon: DollarSign, label: "Importar Salarios", path: "/importar-salarios", adminOnly: true },
   { icon: Upload, label: "Cargar Reporte", path: "/cargar", adminOnly: false },
   { icon: BarChart3, label: "Reportes", path: "/reportes", adminOnly: false },

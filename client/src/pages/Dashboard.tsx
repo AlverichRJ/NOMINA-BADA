@@ -142,14 +142,14 @@ export default function Dashboard() {
       bg: promedioAsistencia >= 80 ? "oklch(0.96 0.03 145)" : "oklch(0.97 0.04 65)",
       change: periodoActivo ? `Período: ${periodoActivo.nombre}` : "Sin período",
     },
-    {
+    ...(isAdmin ? [{
       label: "Total Descuentos",
       value: formatCurrency(totalDescuentos),
       icon: TrendingDown,
       color: "oklch(0.52 0.20 25)",
       bg: "oklch(0.97 0.03 25)",
       change: "Por inasistencias",
-    },
+    }] : []),
   ];
 
   return (
@@ -253,9 +253,11 @@ export default function Dashboard() {
                       <span className="text-sm font-bold" style={{ color: "oklch(0.45 0.18 25)" }}>
                         {emp.diasFalta} {emp.diasFalta === 1 ? "falta" : "faltas"}
                       </span>
-                      <p className="text-xs text-muted-foreground">
-                        -{formatCurrency(parseFloat(emp.descuento as string || "0"))}
-                      </p>
+                      {isAdmin && (
+                        <p className="text-xs text-muted-foreground">
+                          -{formatCurrency(parseFloat(emp.descuento as string || "0"))}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -423,7 +425,7 @@ export default function Dashboard() {
       </div>
 
       {/* Nómina total — siempre muestra el período activo */}
-      {reporteData && periodoActivo && (
+      {isAdmin && reporteData && periodoActivo && (
         <Card
           className="border-0 shadow-md"
           style={{ background: "linear-gradient(135deg, oklch(0.22 0.06 240) 0%, oklch(0.35 0.10 240) 100%)" }}
