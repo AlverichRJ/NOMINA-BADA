@@ -48,7 +48,7 @@ export const reportesProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || (ctx.user.role !== 'admin' && ctx.user.role !== 'reportes')) {
+    if (!ctx.user || (ctx.user.role !== 'admin' && ctx.user.role !== 'reportes' && ctx.user.role !== 'user')) {
       throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permisos para esta acción" });
     }
 
